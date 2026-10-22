@@ -1,0 +1,91 @@
+export type Cue = { start: number; end: number; text: string };
+export type Match = { start: number; end: number; text: string };
+export type CaptionTrack = { cues: Cue[]; language: string; kind: string };
+const words = (s: string) =>
+  s
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[’']/g, "")
+    .match(/[\p{L}\p{N}]+/gu) ?? [];
+/** Join adjacent cues, suppress overlapping rolling-caption repeats, preserve time provenance. */
+export function findSubtitleMatches(cues: Cue[], phrase: string): Match[] {
+  const query = words(phrase);
+  if (!query.length) return [];
+  const tokens: { word: string; start: number; end: number; group: number }[] =
+    [];
+  let group = 0,
+    lastEnd = -10;
+  for (const cue of cues) {
+    if (
+      !Number.isFinite(cue.start) ||
+      !Number.isFinite(cue.end) ||
+      cue.end <= cue.start
+    )
+      continue;
+    if (cue.start - lastEnd > 2) group++;
+    const next = words(cue.text);
+    let overlap = 0;
+    if (cue.start < lastEnd) {
+      for (let n = Math.min(next.length, tokens.length, 80); n > 0; n--) {
+        const tail = tokens.slice(-n);
+        if (tail.every((t, i) => t.group === group && t.word === next[i])) {
+          overlap = n;
+          break;
+        }
+      }
+    }
+    tokens.push(
+      ...next
+        .slice(overlap)
+        .map((word) => ({ word, start: cue.start, end: cue.end, group })),
+    );
+    lastEnd = Math.max(lastEnd, cue.end);
+  }
+  const matches: Match[] = [];
+  for (let i = 0; i <= tokens.length - query.length; i++) {
+    const slice = tokens.slice(i, i + query.length);
+    if (
+      slice.every((t, j) => t.word === query[j] && t.group === slice[0].group)
+    ) {
+      const m = {
+        start: slice[0].start,
+        end: Math.max(...slice.map((t) => t.end)),
+        text: phrase,
+      };
+      if (!matches.some((old) => old.start === m.start && old.end === m.end))
+        matches.push(m);
+    }
+  }
+  return matches;
+}
+export function defaultHeight(heights: number[]): string {
+  const eligible = heights.filter((h) => h > 0 && h <= 1080);
+  return eligible.length ? String(Math.max(...eligible)) : "1080";
+}
+
+/** Widget captions can arrive URL encoded and contain markup/entities. */
+export function cleanWidgetCaption(value: string): string {
+  let text = value;
+  try {
+    text = decodeURIComponent(text);
+  } catch {
+    /* A literal percent sign is valid text. */
+  }
+  const entities: Record<string, string> = {
+    nbsp: " ",
+    amp: "&",
+    quot: '"',
+    apos: "'",
+    lt: "<",
+    gt: ">",
+  };
+  return text
+    .replace(/\[\[\[|\]\]\]/g, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(
+      /&(nbsp|amp|quot|apos|lt|gt);/gi,
+      (_, key: string) => entities[key.toLowerCase()],
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}

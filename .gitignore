@@ -1,0 +1,36 @@
+node_modules/
+dist/
+.tools/
+src-tauri/target/
+src-tauri/binaries/
+*.log
+.DS_Store
+
+*.tsbuildinfo
+src-tauri/gen/
+
+# Local downloads and verification artifacts
+smoke-output/
+*.mp4
+*.mkv
+*.webm
+*.part
+*.partial/
+
+# Authentication and machine-local configuration
+.env
+.env.*
+!.env.example
+cookies*.txt
+*cookies*.json
+settings.json
+*.pem.key
+*.p12
+*.pfx
+
+# Local screenshots and machine-specific build reports
+docs/*.png
+docs/*test-results.json
+docs/release-artifacts.json
+docs/SIGNING_APPROVAL.md
+docs/TEST_RESULTS.md

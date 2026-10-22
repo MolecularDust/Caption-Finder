@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta name="referrer" content="strict-origin-when-cross-origin"><meta charset="utf-8"><style>html,body{margin:0;background:#fff;color:#262833;font:16px system-ui}#widget{width:100%}#preview{display:none}#preview-player{width:100%;height:470px}button{padding:10px 20px;margin:8px;cursor:pointer}#status{padding:12px;color:#676d7a}</style></head><body><div id="status">Loading YouGlish…</div><div id="widget"></div><div id="preview"><button id="back">← Back to YouGlish results</button><div id="preview-player"></div></div><script>
+const q=new URLSearchParams(location.search),token=q.get('token');let widget,yt,videoId='',previewing=false,playerState=-1,pendingSeek=0,pendingPlay=false,ytApiReady=false;
+function send(type,value){parent.postMessage({token,type,value},'*')}
+// Retain the actual expanded caption height, without adding spare blank space.
+// Preview has its own height; returning to results restores the reserved space.
+let lastHeight=0,reservedWidgetHeight=0;
+function reportHeight(){
+ const measured=Math.ceil(document.body.getBoundingClientRect().height)+2;
+ if(!previewing && measured>reservedWidgetHeight)reservedWidgetHeight=measured;
+ const height=previewing ? measured : reservedWidgetHeight;
+ if(height!==lastHeight){lastHeight=height;send('height',height)}
+}
+new ResizeObserver(reportHeight).observe(document.body);
+addEventListener('load',reportHeight);
+function status(text){document.getElementById('status').textContent=text}
+function onYouglishAPIReady(){
+ widget=new YG.Widget('widget',{width:Math.min(920,document.documentElement.clientWidth),components:4+8+16+64+8192,autoStart:1,events:{
+ onFetchDone:e=>{send('fetch',e.totalResult);status(e.totalResult ? '' : 'No results found.')},
+ onVideoChange:e=>{if(!/^[\w-]{11}$/.test(e.video))return;videoId=e.video;send('video',videoId)},
+ onCaptionChange:e=>send('caption',e.caption),
+ onPlayerReady:()=>send('ready',true),
+ onPlayerStateChange:e=>{playerState=e.state;if(!previewing)send('state',e.state)},
+ onError:e=>{status('YouGlish widget error '+e.code+'. Search could not finish.');send('widget-error',e.code)}
+ }});
+ const query=(q.get('query')||'').trim();
+ if(!query){status('Enter a word or phrase to search YouGlish.');return}
+ send('fetch',-1);widget.fetch(query,q.get('lang')||'english',q.get('accent')||undefined);
+}
+function onYouTubeIframeAPIReady(){ytApiReady=true;if(previewing)preparePreview()}
+function preparePreview(){
+ if(!ytApiReady)return;
+ if(yt && typeof yt.loadVideoById !== 'function') return;
+ if(yt && typeof yt.loadVideoById === "function"){yt.loadVideoById({videoId,startSeconds:pendingSeek});if(!pendingPlay)yt.pauseVideo();return}
+ yt=new YT.Player('preview-player',{width:'100%',height:470,videoId,playerVars:{origin:location.origin,playsinline:1,controls:1,start:Math.floor(pendingSeek)},events:{onReady:()=>{yt.seekTo(pendingSeek,true);if(pendingPlay)yt.playVideo();send('ready',true)},onStateChange:e=>send('state',e.data),onError:e=>send('error',e.data)}});
+}
+function showPreview(seconds){
+ pendingSeek=seconds;pendingPlay=false;
+ widget?.pause();previewing=true;
+ document.getElementById('widget').style.display='none';document.getElementById('preview').style.display='block';send('preview',true);preparePreview();
+}
+document.getElementById('back').onclick=()=>{yt?.pauseVideo?.();previewing=false;document.getElementById('preview').style.display='none';document.getElementById('widget').style.display='block';send('preview',false);send('ready',true)};
+addEventListener('message',e=>{
+ if(e.source!==parent||e.data?.token!==token)return;
+ const {action,value}=e.data;
+ if(action==='seek'&&Number.isFinite(value)&&value>=0&&videoId){showPreview(value);return}
+ if(action==='pause'){if(previewing)yt?.pauseVideo?.();else widget?.pause()}
+ if(action==='play'){pendingPlay=true;if(previewing)yt?.playVideo?.();else widget?.play()}
+ if(action==='toggle'){if(previewing){if(yt?.getPlayerState()===1)yt.pauseVideo();else yt?.playVideo?.()}else if(playerState===1)widget?.pause();else widget?.play()}
+});
+setInterval(()=>{if(previewing&&yt?.getCurrentTime)send('time',yt.getCurrentTime())},100);
+setTimeout(()=>{if(!widget)status('YouGlish did not load. Check your connection, then search again.')},20000);
+</script><script src="https://youglish.com/public/emb/widget.js" onerror="status('Unable to load YouGlish. Check your connection.')"></script><script src="https://www.youtube.com/iframe_api"></script></body></html>
