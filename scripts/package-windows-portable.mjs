@@ -50,8 +50,6 @@ cpSync("LICENSES", join(stage, "LICENSES"), { recursive: true });
 for (const name of [
   "DEPENDENCIES.md",
   "WINDOWS.md",
-  "WINDOWS_VALIDATION.md",
-  "WINDOWS_DOWNLOAD_DIAGNOSIS.md",
   "tool-manifest-windows.json",
   "tool-downloads-windows.json",
 ])
