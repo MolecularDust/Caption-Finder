@@ -34,3 +34,5 @@ docs/*test-results.json
 docs/release-artifacts.json
 docs/SIGNING_APPROVAL.md
 docs/TEST_RESULTS.md
+
+dist-portable/

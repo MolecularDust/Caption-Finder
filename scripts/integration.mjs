@@ -9,7 +9,7 @@ const common = [
   "--no-playlist",
   "--no-cache-dir",
   "--js-runtimes",
-  `deno:${join(toolDir, "deno")}`,
+  `deno:${join(toolDir, process.platform === "win32" ? "deno.exe" : "deno")}`,
   "--ffmpeg-location",
   toolDir,
   "--socket-timeout",
@@ -33,7 +33,7 @@ const video = "https://www.youtube.com/watch?v=aqz-KE-bpKQ";
 async function run(name, args) {
   return await new Promise((finish, reject) => {
     const c = spawn(
-      join(toolDir, "yt-dlp"),
+      join(toolDir, process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp"),
       [...common, ...args, "--", video],
       {
         env: {

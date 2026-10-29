@@ -1,3 +1,4 @@
+if (process.platform === 'win32') { await import('./install-tools-windows.mjs'); process.exit(0); }
 import { mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";

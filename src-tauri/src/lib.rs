@@ -1,6 +1,8 @@
 mod captions;
+mod diagnostics;
 mod download_files;
 mod model;
+mod network;
 mod platform;
 mod player;
 use model::*;
@@ -20,7 +22,11 @@ struct Backend {
     analyzer: Arc<Mutex<Option<u32>>>,
 }
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let p = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let p = if platform::portable() {
+        platform::data_dir()?
+    } else {
+        app.path().app_config_dir().map_err(|e| e.to_string())?
+    };
     std::fs::create_dir_all(&p).map_err(|e| e.to_string())?;
     Ok(p.join("settings.json"))
 }
@@ -54,6 +60,8 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
         "20",
         "--retries",
         "0",
+        "--fragment-retries",
+        "0",
         "--extractor-retries",
         "0",
         "--sleep-requests",
@@ -67,7 +75,9 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
     if let Ok(p) = platform::binary("deno") {
         c.arg("--js-runtimes").arg(format!("deno:{}", p.display()));
     }
+    network::configure(&mut c);
     auth(&mut c, s)?;
+    diagnostics::log(diagnostics::Stage::Invocation, s, None, "");
     Ok(c)
 }
 fn safe_error(text: &str) -> String {
@@ -76,23 +86,31 @@ fn safe_error(text: &str) -> String {
         "The bundled downloader cannot load Python under the current macOS signature. This package needs its sidecar signing configuration corrected; use the development build in the meantime.".into()
     } else if t.contains("certificate verify failed") {
         "The media server certificate could not be verified. Check the bundled certificate store and network trust settings. Certificate verification was not bypassed.".into()
-    } else if t.contains("429") || t.contains("too many requests") {
+    } else if diagnostics::http_statuses(text).contains(&429) {
         "YouTube rate-limited this request. Stop and try later; automatic retries are disabled."
             .into()
-    } else if t.contains("ssl_connect")
+    } else if diagnostics::connection_reset(text)
+        || t.contains("ssl_connect")
         || t.contains("unexpected_eof")
         || t.contains("ssl_error_syscall")
         || t.contains("connection closed")
+        || t.contains("-10054")
+        || t.contains("handshake response")
     {
         "The secure network connection closed unexpectedly. Try again later; certificate checks remain enabled.".into()
+    } else if t.contains("could not copy") && t.contains("cookie") {
+        if cfg!(windows) {
+            "Windows could not copy the browser cookie database. Close all browser windows and background processes, then retry. If access remains unavailable, import a Netscape cookies file. Browser security protections were not bypassed.".into()
+        } else {
+            "The browser cookie database could not be accessed. Close the browser and check its profile permissions.".into()
+        }
     } else if t.contains("cookie decryption failed")
         || t.contains("failed to decrypt")
-        || t.contains("could not copy") && t.contains("cookie")
         || t.contains("could not find") && t.contains("cookie")
         || t.contains("failed to load cookies")
         || t.contains("keychain") && t.contains("error")
     {
-        "Browser cookies are unavailable. Check the browser installation, macOS permissions, and cookie store; alternatively import a Netscape cookies file.".into()
+        "Browser cookies are unavailable. Check the browser installation, browser permissions, and cookie store (close the browser first on Windows; Chromium encryption may require importing a Netscape cookies file); alternatively import a Netscape cookies file.".into()
     } else if t.contains("sign in")
         || t.contains("http error 403")
         || t.contains("403 forbidden")
@@ -107,26 +125,9 @@ fn safe_error(text: &str) -> String {
 }
 #[tauri::command]
 fn installed_browsers() -> Vec<String> {
-    let roots = [
-        PathBuf::from("/Applications"),
-        PathBuf::from("/System/Applications"),
-        PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join("Applications"),
-    ];
-    [
-        ("opera", "Opera.app"),
-        ("chrome", "Google Chrome.app"),
-        ("firefox", "Firefox.app"),
-        ("safari", "Safari.app"),
-        ("edge", "Microsoft Edge.app"),
-        ("brave", "Brave Browser.app"),
-        ("chromium", "Chromium.app"),
-        ("vivaldi", "Vivaldi.app"),
-    ]
-    .iter()
-    .filter(|(_, app)| roots.iter().any(|root| root.join(app).is_dir()))
-    .map(|(id, _)| id.to_string())
-    .collect()
+    platform::installed_browsers()
 }
+
 #[tauri::command]
 fn get_settings(s: State<Backend>) -> Settings {
     s.settings.lock().unwrap().clone()
@@ -171,11 +172,14 @@ async fn caption_track(
     s: State<'_, Backend>,
 ) -> Result<serde_json::Value, String> {
     let settings = s.settings.lock().unwrap().clone();
-    let cache = app
-        .path()
-        .app_cache_dir()
-        .map_err(|_| "Cannot locate caption cache")?
-        .join("captions");
+    let cache = if platform::portable() {
+        platform::data_dir()?.join("Cache")
+    } else {
+        app.path()
+            .app_cache_dir()
+            .map_err(|_| "Cannot locate caption cache")?
+    }
+    .join("captions");
     tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, settings, cache))
         .await
         .map_err(|_| "Caption worker stopped".to_string())?
@@ -200,9 +204,10 @@ async fn analyze(url: String, s: State<'_, Backend>) -> Result<serde_json::Value
     let result=tauri::async_runtime::spawn_blocking(move || ->Result<serde_json::Value,String> {
         let mut command=base(&settings)?;
         command.args(["--dump-single-json","--skip-download","--",&normalized]).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let child=command.spawn().map_err(|_|"Cannot start yt-dlp")?;
+        let child=platform::spawn(&mut command).map_err(|_|"Cannot start yt-dlp")?;
         *process.lock().unwrap()=Some(child.id());
         let o=child.wait_with_output().map_err(|_|"Metadata worker stopped")?;
+        diagnostics::log(diagnostics::Stage::Analysis, &settings, o.status.code(), &String::from_utf8_lossy(&o.stderr));
         if !o.status.success(){return Err(safe_error(&String::from_utf8_lossy(&o.stderr)))}
         let v:serde_json::Value=serde_json::from_slice(&o.stdout).map_err(|_|"Invalid metadata response")?;
         if v["is_live"].as_bool()==Some(true){return Err("Live videos are not supported; choose a finished video".into())}
@@ -324,7 +329,7 @@ fn download(
             .arg(normalize(&r.url)?)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        let mut child = c.spawn().map_err(|_| "Unable to start downloader")?;
+        let mut child = platform::spawn(&mut c).map_err(|_| "Unable to start downloader")?;
         {
             let mut map = jobs.lock().unwrap();
             let j = map.get_mut(&id).unwrap();
@@ -416,6 +421,7 @@ fn download(
             .wait()
             .map_err(|_| "Downloader did not exit cleanly")?;
         let errors = errors.join().unwrap_or_default();
+        diagnostics::log(diagnostics::Stage::Download, &s, status.code(), &errors);
         update(&app, &jobs, &id, |j| j.pid = 0);
         if jobs.lock().unwrap()[&id].state == "canceled" {
             return Ok(());
@@ -433,18 +439,16 @@ fn download(
                 return Ok(());
             }
         }
-        let probe = platform::command("ffprobe")?
-            .args([
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration:stream=codec_type,codec_name,width,height,start_time,duration",
-                "-of",
-                "json",
-                &path,
-            ])
-            .output()
-            .map_err(|_| "Cannot inspect output")?;
+        let probe = platform::output(platform::command("ffprobe")?.args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration:stream=codec_type,codec_name,width,height,start_time,duration",
+            "-of",
+            "json",
+            &path,
+        ]))
+        .map_err(|_| "Cannot inspect output")?;
         if !probe.status.success() {
             return Err("Output failed FFprobe inspection".into());
         }
@@ -614,26 +618,24 @@ fn normalize_fast(
     path: &str,
     request: &Request,
 ) -> Result<(), String> {
-    let scan = platform::command("ffprobe")?
-        .args([
-            "-v",
-            "error",
-            "-select_streams",
-            if request.mode == "audio" {
-                "a:0"
-            } else {
-                "v:0"
-            },
-            "-read_intervals",
-            "%+#64",
-            "-show_entries",
-            "packet=pts_time:format=duration",
-            "-of",
-            "json",
-            path,
-        ])
-        .output()
-        .map_err(|_| "Cannot inspect clip timestamps")?;
+    let scan = platform::output(platform::command("ffprobe")?.args([
+        "-v",
+        "error",
+        "-select_streams",
+        if request.mode == "audio" {
+            "a:0"
+        } else {
+            "v:0"
+        },
+        "-read_intervals",
+        "%+#64",
+        "-show_entries",
+        "packet=pts_time:format=duration",
+        "-of",
+        "json",
+        path,
+    ]))
+    .map_err(|_| "Cannot inspect clip timestamps")?;
     let v: serde_json::Value =
         serde_json::from_slice(&scan.stdout).map_err(|_| "Cannot read clip timestamps")?;
     let first = v["packets"]
@@ -671,27 +673,28 @@ fn normalize_fast(
         .and_then(|e| e.to_str())
         .ok_or("Invalid clip extension")?;
     let temp = p.with_extension(format!("normalized.{ext}"));
-    let child = platform::command("ffmpeg")?
-        .args([
-            "-v",
-            "error",
-            "-n",
-            "-ss",
-            &first.to_string(),
-            "-i",
-            path,
-            "-map",
-            "0",
-            "-c",
-            "copy",
-            "-avoid_negative_ts",
-            "make_zero",
-        ])
-        .arg(&temp)
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|_| "Cannot normalize clip timestamps")?;
+    let child = platform::spawn(
+        platform::command("ffmpeg")?
+            .args([
+                "-v",
+                "error",
+                "-n",
+                "-ss",
+                &first.to_string(),
+                "-i",
+                path,
+                "-map",
+                "0",
+                "-c",
+                "copy",
+                "-avoid_negative_ts",
+                "make_zero",
+            ])
+            .arg(&temp)
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped()),
+    )
+    .map_err(|_| "Cannot normalize clip timestamps")?;
     let canceled = {
         let mut map = jobs.lock().unwrap();
         let j = map.get_mut(id).unwrap();
@@ -725,7 +728,15 @@ fn normalize_fast(
 
 #[tauri::command]
 fn enqueue(app: tauri::AppHandle, s: State<Backend>, request: Request) -> Result<String, String> {
-    validate(&request)?;
+    if let Err(message) = validate(&request) {
+        diagnostics::log(
+            diagnostics::Stage::QueueRejected,
+            &s.settings.lock().unwrap(),
+            None,
+            "",
+        );
+        return Err(message);
+    }
     if !PathBuf::from(&request.destination).is_dir() {
         return Err("Choose an existing destination folder".into());
     }
@@ -829,7 +840,17 @@ fn reveal(s: State<Backend>, id: String) -> Result<(), String> {
             .spawn()
             .map_err(|_| "Could not reveal file")?;
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg(format!(
+                "/select,{}",
+                j.path.strip_prefix(r"\\?\").unwrap_or(&j.path)
+            ))
+            .spawn()
+            .map_err(|_| "Could not reveal file")?;
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     return Err("Reveal is not implemented for this platform".into());
     Ok(())
 }
@@ -845,9 +866,22 @@ fn read_clipboard(app: tauri::AppHandle) -> Result<String, String> {
     Ok(text.trim().to_string())
 }
 pub fn run() {
+    #[cfg(windows)]
+    if platform::portable() {
+        let data = platform::data_dir().expect("Move the portable app to a writable directory");
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", data.join("WebView2"));
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
+            let log_dir = if platform::portable() {
+                platform::data_dir().map(|p| p.join("Diagnostics"))
+            } else {
+                app.path().app_log_dir().map_err(|e| e.to_string())
+            };
+            if let Ok(path) = log_dir {
+                diagnostics::initialize(path);
+            }
             let settings = settings_path(app.handle())
                 .ok()
                 .and_then(|p| std::fs::read(p).ok())
@@ -949,6 +983,34 @@ mod error_tests {
         );
     }
     #[test]
+    fn windows_exit_code_is_not_http_429() {
+        let e = safe_error("ERROR: ffmpeg exited with code 4294957242");
+        assert!(!e.contains("rate-limited"));
+        assert!(e.contains("network connection"));
+        assert!(safe_error("ERROR: HTTP Error 429: Too Many Requests").contains("rate-limited"));
+        assert!(
+            !safe_error("ERROR: failed https://example.com/?token=429").contains("rate-limited")
+        );
+    }
+    #[test]
+    fn anonymous_and_browser_modes_share_network_configuration() {
+        let anon = base(&Settings::default()).unwrap();
+        let mut settings = Settings::default();
+        settings.browser = "edge".into();
+        let browser = base(&settings).unwrap();
+        let a = anon
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        let b = browser
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(!a.iter().any(|x| x == "--cookies-from-browser"));
+        assert_eq!(&b[..a.len()], a.as_slice());
+        assert_eq!(&b[a.len()..], ["--cookies-from-browser", "edge"]);
+    }
+    #[test]
     fn sensitive_diagnostics_are_not_reflected() {
         let e = safe_error("Cookie decryption failed: SECRET_VALUE /private/auth-file.txt");
         assert!(!e.contains("SECRET_VALUE"));
@@ -966,5 +1028,48 @@ mod error_tests {
     #[test]
     fn macos_private_paths_do_not_imply_private_videos() {
         assert!(!safe_error("/private/var/tmp: unexpected failure").contains("YouTube denied"));
+    }
+}
+
+#[cfg(all(test, windows))]
+mod configured_route_tests {
+    use super::*;
+    #[test]
+    #[ignore = "Requires this workstation's configured manual Windows proxy; no network access"]
+    fn configured_windows_route_is_explicit_in_anonymous_and_authenticated_modes() {
+        assert_eq!(network::proxy_source(), "windows_manual");
+        for browser in ["", "edge", "opera"] {
+            let mut settings = Settings::default();
+            settings.browser = browser.into();
+            let c = base(&settings).unwrap();
+            let args = c
+                .get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            let n = args
+                .iter()
+                .position(|a| a == "--proxy")
+                .expect("Windows manual proxy was not forwarded");
+            let proxy = url::Url::parse(&args[n + 1]).unwrap();
+            assert_eq!(proxy.host_str(), Some("127.0.0.1"));
+            assert!(proxy.username().is_empty());
+            assert_eq!(
+                args.iter().any(|a| a == "--cookies-from-browser"),
+                !browser.is_empty()
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod cookie_error_tests {
+    use super::*;
+    #[test]
+    fn cookie_database_copy_error_is_separate_from_http_and_decryption() {
+        let message=safe_error("ERROR: Could not copy Chrome cookie database. See https://github.com/yt-dlp/yt-dlp/issues/7271");
+        assert!(message.contains("cookie database"));
+        assert!(!message.contains("rate-limited"));
+        assert!(!message.contains("decryption failed"));
+        assert!(!message.contains("github.com"));
     }
 }

@@ -57,4 +57,4 @@ npm run desktop
 
 The existing local Rust caches are optional and are not part of this repository. A fresh machine uses its installed Rust toolchain.
 
-**Windows status:** the source is available for development, but a working Windows app/installer has not yet been verified. See [the Windows handoff](docs/WINDOWS.md) for the remaining platform work. The macOS packaging commands must not be used on Windows.
+**Windows:** build the portable ZIP with `npm run package:portable` (Windows 11 x64, system WebView2). It includes all four media tools and uses an application-local Data folder. An optional NSIS installer is available via `npm run package:windows`. See [Windows instructions](docs/WINDOWS.md) and [actual validation results and remaining limits](docs/WINDOWS_VALIDATION.md), including remote segment-download failures. macOS packaging commands remain macOS-only.

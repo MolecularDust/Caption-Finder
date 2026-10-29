@@ -1,0 +1,25 @@
+{
+  "bundle": {
+    "targets": ["nsis"],
+    "externalBin": [
+      "binaries/yt-dlp",
+      "binaries/ffmpeg",
+      "binaries/ffprobe",
+      "binaries/deno"
+    ],
+    "resources": {
+      "resources/cacert.pem": "resources/cacert.pem",
+      "../LICENSES/": "LICENSES/",
+      "../docs/DEPENDENCIES.md": "DEPENDENCIES.md",
+      "../docs/tool-manifest-windows.json": "tool-manifest-windows.json"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

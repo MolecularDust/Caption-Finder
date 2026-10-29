@@ -1,3 +1,4 @@
+if (process.platform === 'win32') { await import('./prepare-sidecars-windows.mjs'); process.exit(0); }
 import {
   copyFileSync,
   mkdirSync,

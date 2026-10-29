@@ -13,7 +13,7 @@ for (const [name, ext, expected] of [
   let normalized = false;
   if (name === "fast") {
     const scan = spawnSync(
-      join(toolDir, "ffprobe"),
+      join(toolDir, process.platform === "win32" ? "ffprobe.exe" : "ffprobe"),
       [
         "-v",
         "error",
@@ -37,7 +37,7 @@ for (const [name, ext, expected] of [
     if (first > 0.25) {
       const output = mkdtempSync(join(testDir, "verify-")) + "/fast.mkv";
       const remux = spawnSync(
-        join(toolDir, "ffmpeg"),
+        join(toolDir, process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"),
         [
           "-v",
           "error",
@@ -63,7 +63,7 @@ for (const [name, ext, expected] of [
     }
   }
   const p = spawnSync(
-    join(toolDir, "ffprobe"),
+    join(toolDir, process.platform === "win32" ? "ffprobe.exe" : "ffprobe"),
     ["-v", "error", "-show_format", "-show_streams", "-of", "json", file],
     { encoding: "utf8" },
   );
@@ -81,7 +81,7 @@ for (const [name, ext, expected] of [
     throw Error("Precise duration exceeds tolerance");
   if (skew > 0.15) throw Error(`Stream start skew too large: ${name}`);
   const decode = spawnSync(
-    join(toolDir, "ffmpeg"),
+    join(toolDir, process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"),
     [
       "-v",
       "error",

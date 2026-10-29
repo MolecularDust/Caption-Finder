@@ -61,7 +61,7 @@ impl DownloadFiles {
                 PathBuf::from(format!("{stem} ({number}){extension}"))
             };
             let destination = self.destination.join(candidate);
-            match std::fs::hard_link(&path, &destination) {
+            match publish_new(&path, &destination) {
                 Ok(()) => return Ok(destination),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
@@ -169,4 +169,24 @@ mod tests {
         assert_eq!(std::fs::read(final_path).unwrap(), b"replacement");
         std::fs::remove_dir_all(dest).unwrap();
     }
+}
+
+// create_new preserves collision safety on removable FAT/exFAT volumes without hard links.
+fn publish_new(source: &Path, destination: &Path) -> std::io::Result<()> {
+    match std::fs::hard_link(source, destination) {
+        Ok(()) => return Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Err(e),
+        Err(_) => {}
+    }
+    let mut input = std::fs::File::open(source)?;
+    let mut output = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(destination)?;
+    let result = std::io::copy(&mut input, &mut output).and_then(|_| output.sync_all());
+    drop(output);
+    if result.is_err() {
+        let _ = std::fs::remove_file(destination);
+    }
+    result
 }
