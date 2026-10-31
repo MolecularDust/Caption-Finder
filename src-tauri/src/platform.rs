@@ -6,6 +6,20 @@ pub fn binary(name: &str) -> Result<PathBuf, String> {
         name.to_string()
     };
     let exe = std::env::current_exe().map_err(|_| "Cannot locate application")?;
+    #[cfg(target_os = "macos")]
+    if name == "yt-dlp" {
+        // Unpacked build: starts in ~0.2 s instead of unpacking itself on every launch.
+        let unpacked = exe.parent().unwrap().join("../Resources/yt-dlp/yt-dlp_macos");
+        if unpacked.is_file() {
+            return Ok(unpacked);
+        }
+        if cfg!(debug_assertions) {
+            let local = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.tools/yt-dlp-dir/yt-dlp_macos");
+            if local.is_file() {
+                return Ok(local);
+            }
+        }
+    }
     let bundled = exe.parent().unwrap().join(&name);
     if bundled.is_file() {
         return Ok(bundled);
