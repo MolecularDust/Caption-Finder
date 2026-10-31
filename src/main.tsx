@@ -26,7 +26,6 @@ import {
 } from "./domain";
 import {
   findSubtitleMatches,
-  chooseByContext,
   matchContext,
   type Cue,
   cleanWidgetCaption,
@@ -178,8 +177,7 @@ function App() {
     [mode, setMode] = useState("video"),
     [subtitle, setSubtitle] = useState(""),
     [jobs, setJobs] = useState<Job[]>([]);
-  const widgetCaptions = useRef<string[]>([]),
-    captionCues = useRef<Cue[]>([]),
+  const captionCues = useRef<Cue[]>([]),
     candidateRef = useRef(""),
     dirtyName = useRef(false),
     captureCaption = useRef(false),
@@ -278,7 +276,6 @@ function App() {
         /^[\w-]{11}$/.test(value)
       ) {
         candidateRef.current = value;
-        widgetCaptions.current = [];
         setPickerOpen(false);
         matchRequest.current++;
         dirtyName.current = false;
@@ -304,13 +301,6 @@ function App() {
         setPadding(2);
         setMetadataLoading(false);
         setMetadataStatus("");
-      }
-      if (type === "caption" && typeof value === "string") {
-        // Keep what YouGlish shows after this sample starts; it tells repeated occurrences apart.
-        const seen = cleanWidgetCaption(value);
-        const list = widgetCaptions.current;
-        if (seen && list[list.length - 1] !== seen)
-          widgetCaptions.current = [...list, seen].slice(-12);
       }
       if (
         type === "caption" &&
@@ -496,17 +486,8 @@ function App() {
         setMatches(found);
         setMatchChosen(false);
         setPickerOpen(false);
-        const pick =
-          found.length > 1
-            ? chooseByContext(cached.track.cues, found, widgetCaptions.current)
-            : null;
         if (found.length === 1) selectMatch(found[0], v);
-        else if (pick !== null) {
-          selectMatch(found[pick], v);
-          setMatchStatus(
-            `${found.length} matches — chose the one that follows the YouGlish sample (${preciseTimestamp(found[pick].start)}). Pick another below if needed.`,
-          );
-        } else if (found.length) {
+        else if (found.length) {
           setMatchStatus(
             `${found.length} matches — choose the occurrence you want.`,
           );

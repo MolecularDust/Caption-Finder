@@ -3,7 +3,6 @@ import {
   findSubtitleMatches,
   defaultHeight,
   cleanWidgetCaption,
-  chooseByContext,
   matchContext,
 } from "./subtitles";
 describe("subtitle selection", () => {
@@ -95,26 +94,6 @@ describe("repeated occurrences", () => {
   ];
   const found = findSubtitleMatches(cues, "How did they treat you?");
   it("finds both occurrences", () => expect(found).toHaveLength(2));
-  it("chooses the one whose following captions the widget showed", () => {
-    expect(
-      chooseByContext(cues, found, [
-        "How did they treat you?",
-        "Now, I do not raise this issue to complain",
-      ]),
-    ).toBe(1);
-    expect(
-      chooseByContext(cues, found, [
-        "How did they treat you?",
-        "I was seven. I did not understand.",
-      ]),
-    ).toBe(0);
-  });
-  it("does not guess from the sample caption alone", () => {
-    expect(
-      chooseByContext(cues, found, ["How did they treat you?"]),
-    ).toBeNull();
-    expect(chooseByContext(cues, found, [])).toBeNull();
-  });
   it("describes the neighbouring captions of a match", () => {
     expect(matchContext(cues, found[1])).toEqual({
       before: "my mother's question hangs in the air for me:",

@@ -90,7 +90,6 @@ export function cleanWidgetCaption(value: string): string {
     .trim();
 }
 
-const norm = (s: string) => words(s).join(" ");
 function cueIndex(cues: Cue[], match: Match): number {
   let best = -1,
     distance = Infinity;
@@ -118,31 +117,4 @@ export function matchContext(
       .filter(Boolean)
       .join(" "),
   };
-}
-/**
- * Pick the occurrence whose surrounding subtitles contain the captions YouGlish has shown for
- * this sample (it reports the caption text, but not a time). Returns null unless exactly one
- * occurrence matches better than the rest.
- */
-export function chooseByContext(
-  cues: Cue[],
-  matches: Match[],
-  widgetCaptions: string[],
-): number | null {
-  const seen = widgetCaptions.map(norm).filter((c) => c.length >= 12);
-  if (matches.length < 2 || !seen.length) return null;
-  const scores = matches.map((m) => {
-    const i = cueIndex(cues, m);
-    const around = norm(
-      cues
-        .slice(Math.max(0, i - 1), i + 7)
-        .map((c) => c.text)
-        .join(" "),
-    );
-    return new Set(seen.filter((c) => around.includes(c))).size;
-  });
-  const top = Math.max(...scores);
-  return top > 0 && scores.filter((n) => n === top).length === 1
-    ? scores.indexOf(top)
-    : null;
 }
