@@ -23,6 +23,7 @@ pub fn binary(name: &str) -> Result<PathBuf, String> {
         ]) {
             let p = dir.join(&name);
             if p.is_file() {
+                eprintln!("warning: using unpinned {name} from {}", p.display());
                 return Ok(p);
             }
         }
@@ -207,4 +208,22 @@ pub fn spawn(c: &mut Command) -> std::io::Result<std::process::Child> {
 #[cfg(not(windows))]
 pub fn output(c: &mut Command) -> std::io::Result<std::process::Output> {
     c.output()
+}
+
+/// Whether a process id belongs to a running process. Used to recognise leftovers of dead instances.
+pub fn process_alive(pid: u32) -> bool {
+    #[cfg(unix)]
+    {
+        let r = unsafe { libc::kill(pid as i32, 0) };
+        r == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+    }
+    #[cfg(windows)]
+    {
+        windows_process::process_alive(pid)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = pid;
+        true
+    }
 }

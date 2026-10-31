@@ -22,7 +22,7 @@ Account & Settings defaults to anonymous. Installed supported browsers are detec
 
 `npm run build`, `npm test`, and `npm run lint` check the frontend. `npm run desktop` launches the native development app. `node scripts/desktop.mjs build --debug --bundles app --config src-tauri/tauri.dev-bundle.conf.json` makes a local evaluation bundle.
 
-This workspace reuses a read-only Rust toolchain location from the upstream project, with copied local Cargo caches and dependencies. The `.app` includes yt-dlp, FFmpeg, FFprobe, Deno, and certificate resources. It is a local development build, not a notarized distribution release. Do not use the upstream release signing instructions or artifact hashes as verification of this fork. See `docs/PHONETIC_FORK_STATUS.md` for actual checks and limitations.
+The Rust toolchain version is pinned in `rust-toolchain.toml`; `rustup` installs it on first use. The `.app` includes yt-dlp, FFmpeg, FFprobe, Deno, and certificate resources. It is a local development build, not a notarized distribution release. Do not use the upstream release signing instructions or artifact hashes as verification of this fork. See `docs/PHONETIC_FORK_STATUS.md` for actual checks and limitations.
 
 ## Integration references
 
@@ -55,10 +55,14 @@ npm run prepare:sidecars
 npm run desktop
 ```
 
-The existing local Rust caches are optional and are not part of this repository. A fresh machine uses its installed Rust toolchain.
+Run native unit tests with `cargo test --manifest-path src-tauri/Cargo.toml`. Debug builds fall back to yt-dlp/FFmpeg found on `PATH` and print a warning when they do; release bundles use only the pinned sidecars.
 
 **Windows:** build the portable ZIP with `npm run package:portable` (Windows 11 x64, system WebView2). It includes all four media tools and uses an application-local Data folder. An optional NSIS installer is available via `npm run package:windows`. See [Windows instructions](docs/WINDOWS.md) for status, tested behavior, and remaining limits. macOS packaging commands remain macOS-only.
 
 ## Agent collaboration
 
 For concurrent development or an independent review, start with [collaboration instructions](docs/COLLABORATION.md) and [AGENTS.md](AGENTS.md). Each agent uses a separate branch and working folder. Return changes using the [handoff template](docs/HANDOFF_TEMPLATE.md).
+
+## App-session cookies
+
+With "App’s YouTube session" selected, a Netscape cookie file is written to `sessions/` inside the app’s private cache folder (mode 0600 on macOS) immediately before each Look Up, Analyze or download, and deleted when that yt-dlp run ends. Queued downloads hold no cookie file; they take a fresh snapshot when they start. Files left by a crash or force-quit are removed the next time the app starts, as are stale `.tubecutter-<pid>-*.partial` staging folders in the saved destination. Windows file protection relies on the user-profile folder’s default permissions and has not been tested.

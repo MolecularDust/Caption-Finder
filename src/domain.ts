@@ -192,18 +192,22 @@ export function safeFileName(input: string): string {
       (c) =>
         c.codePointAt(0)! > 31 &&
         c.codePointAt(0)! !== 127 &&
+        !/[\p{Cc}\u2028\u2029]/u.test(c) &&
         !'<>:"/\\|?*'.includes(c),
     )
     .join("");
-  name = name.trim().replace(/[. ]+$/, "");
-  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name))
+  // A final period is valid: the extension is appended after it.
+  name = name.trim();
+  if (/^\.*$/.test(name)) name = "";
+  if (/^(con|prn|aux|nul|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(\.|$)/i.test(name))
     name = `_${name}`;
   let result = "";
   for (const c of name) {
     if (new TextEncoder().encode(result + c).length > 180) break;
     result += c;
   }
-  return result.trim().replace(/[. ]+$/, "") || "Speech sample";
+  result = result.trim();
+  return /^\.*$/.test(result) ? "Speech sample" : result;
 }
 export function fileNameNeedsFix(input: string): boolean {
   const stem = input.trim().replace(/\.(mp4|mkv)$/i, "");
@@ -211,6 +215,7 @@ export function fileNameNeedsFix(input: string): boolean {
     stem !== safeFileName(input) ||
     Array.from(input).some(
       (c) => c.codePointAt(0)! < 32 || c.codePointAt(0)! === 127,
-    )
+    ) ||
+    /[\u2028\u2029]/.test(input)
   );
 }
