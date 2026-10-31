@@ -26,6 +26,9 @@ import {
 } from "./domain";
 import {
   findSubtitleMatches,
+  chooseByContext,
+  matchContext,
+  type Cue,
   cleanWidgetCaption,
   defaultHeight,
   type Match,
@@ -138,6 +141,7 @@ function App() {
     [candidate, setCandidate] = useState(""),
     [matches, setMatches] = useState<Match[]>([]),
     [matchChosen, setMatchChosen] = useState(false),
+    [pickerOpen, setPickerOpen] = useState(false),
     [matchStatus, setMatchStatus] = useState(""),
     [fileName, setFileName] = useState(""),
     [fileNameEditing, setFileNameEditing] = useState(false),
@@ -174,7 +178,9 @@ function App() {
     [mode, setMode] = useState("video"),
     [subtitle, setSubtitle] = useState(""),
     [jobs, setJobs] = useState<Job[]>([]);
-  const candidateRef = useRef(""),
+  const widgetCaptions = useRef<string[]>([]),
+    captionCues = useRef<Cue[]>([]),
+    candidateRef = useRef(""),
     dirtyName = useRef(false),
     captureCaption = useRef(false),
     matchRequest = useRef(0);
@@ -272,6 +278,8 @@ function App() {
         /^[\w-]{11}$/.test(value)
       ) {
         candidateRef.current = value;
+        widgetCaptions.current = [];
+        setPickerOpen(false);
         matchRequest.current++;
         dirtyName.current = false;
         captureCaption.current = true;
@@ -296,6 +304,13 @@ function App() {
         setPadding(2);
         setMetadataLoading(false);
         setMetadataStatus("");
+      }
+      if (type === "caption" && typeof value === "string") {
+        // Keep what YouGlish shows after this sample starts; it tells repeated occurrences apart.
+        const seen = cleanWidgetCaption(value);
+        const list = widgetCaptions.current;
+        if (seen && list[list.length - 1] !== seen)
+          widgetCaptions.current = [...list, seen].slice(-12);
       }
       if (
         type === "caption" &&
@@ -420,6 +435,7 @@ function App() {
   const selectMatch = (m: Match, v = video) => {
     if (!v) return;
     setMatchChosen(true);
+    setPickerOpen(false);
     setResetVersion((n) => n + 1);
     setInValid(true);
     setOutValid(true);
@@ -473,17 +489,31 @@ function App() {
         const v = cached.video;
         if (!v.duration || !Number.isFinite(v.duration))
           throw Error("Choose a finished video with a finite duration.");
+        captionCues.current = cached.track.cues;
         const found = findSubtitleMatches(cached.track.cues, text);
         setVideo(v);
         setResolution(defaultHeight(v.formats.map((f) => f.height ?? 0)));
         setMatches(found);
         setMatchChosen(false);
+        setPickerOpen(false);
+        const pick =
+          found.length > 1
+            ? chooseByContext(cached.track.cues, found, widgetCaptions.current)
+            : null;
         if (found.length === 1) selectMatch(found[0], v);
-        else
+        else if (pick !== null) {
+          selectMatch(found[pick], v);
           setMatchStatus(
-            found.length
-              ? `${found.length} matches — choose the occurrence below.`
-              : "No subtitle match. Timings were not changed; edit the phrase or set In/Out manually.",
+            `${found.length} matches — chose the one that follows the YouGlish sample (${preciseTimestamp(found[pick].start)}). Pick another below if needed.`,
+          );
+        } else if (found.length) {
+          setMatchStatus(
+            `${found.length} matches — choose the occurrence you want.`,
+          );
+          setPickerOpen(true);
+        } else
+          setMatchStatus(
+            "No subtitle match. Timings were not changed; edit the phrase or set In/Out manually.",
           );
         if (found.length === 1)
           setMatchStatus(
@@ -1399,6 +1429,44 @@ function App() {
           <span>Made for your personal library.</span>
         </footer>
       </main>
+      {pickerOpen && matches.length > 1 && video && (
+        <div className="modal-backdrop">
+          <section
+            className="modal match-picker"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose an occurrence"
+          >
+            <h2>Choose the occurrence</h2>
+            <p>
+              This phrase appears {matches.length} times in the video. YouGlish
+              does not tell the app which one you picked, so choose it here.
+            </p>
+            <ul>
+              {matches.map((m, i) => {
+                const ctx = matchContext(captionCues.current, m);
+                return (
+                  <li key={`${m.start}-${i}`}>
+                    <button onClick={() => selectMatch(m)}>
+                      <strong>
+                        {preciseTimestamp(m.start)} – {preciseTimestamp(m.end)}
+                      </strong>
+                      <span>
+                        {ctx.before && `…${ctx.before} `}
+                        <mark>{m.text}</mark>
+                        {ctx.after && ` ${ctx.after}…`}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="error-popup-actions">
+              <button onClick={() => setPickerOpen(false)}>Decide later</button>
+            </div>
+          </section>
+        </div>
+      )}
       {error && (
         <ErrorPopup
           message={error}

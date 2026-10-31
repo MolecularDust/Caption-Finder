@@ -3,6 +3,8 @@ import {
   findSubtitleMatches,
   defaultHeight,
   cleanWidgetCaption,
+  chooseByContext,
+  matchContext,
 } from "./subtitles";
 describe("subtitle selection", () => {
   it("finds a phrase spanning adjacent cues with punctuation and contractions", () => {
@@ -66,5 +68,57 @@ describe("widget caption decoding", () => {
     expect(cleanWidgetCaption("100% sure &amp; ready")).toBe(
       "100% sure & ready",
     );
+  });
+});
+
+describe("repeated occurrences", () => {
+  const cues = [
+    { start: 112, end: 113, text: "my mother looked at me and she said," },
+    { start: 113.6, end: 115.9, text: '"How did they treat you?"' },
+    { start: 116, end: 118, text: "I was seven. I did not understand." },
+    ...Array.from({ length: 12 }, (_, n) => ({
+      start: 120 + n * 10,
+      end: 125 + n * 10,
+      text: `unrelated filler caption number ${n}`,
+    })),
+    {
+      start: 298,
+      end: 300,
+      text: "my mother's question hangs in the air for me:",
+    },
+    { start: 300.5, end: 302.6, text: "How did they treat you?" },
+    {
+      start: 303,
+      end: 306,
+      text: "Now, I do not raise this issue to complain",
+    },
+  ];
+  const found = findSubtitleMatches(cues, "How did they treat you?");
+  it("finds both occurrences", () => expect(found).toHaveLength(2));
+  it("chooses the one whose following captions the widget showed", () => {
+    expect(
+      chooseByContext(cues, found, [
+        "How did they treat you?",
+        "Now, I do not raise this issue to complain",
+      ]),
+    ).toBe(1);
+    expect(
+      chooseByContext(cues, found, [
+        "How did they treat you?",
+        "I was seven. I did not understand.",
+      ]),
+    ).toBe(0);
+  });
+  it("does not guess from the sample caption alone", () => {
+    expect(
+      chooseByContext(cues, found, ["How did they treat you?"]),
+    ).toBeNull();
+    expect(chooseByContext(cues, found, [])).toBeNull();
+  });
+  it("describes the neighbouring captions of a match", () => {
+    expect(matchContext(cues, found[1])).toEqual({
+      before: "my mother's question hangs in the air for me:",
+      after: "Now, I do not raise this issue to complain",
+    });
   });
 });
