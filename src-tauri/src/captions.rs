@@ -1,4 +1,4 @@
-use crate::{interactive, model::Settings, safe_error};
+use crate::{base, model::Settings, safe_error};
 use serde_json::{json, Value};
 use std::{path::PathBuf, process::Stdio};
 struct TempDir(PathBuf);
@@ -46,7 +46,7 @@ pub fn retrieve(
     {
         return Err("Unsupported caption language code".into());
     }
-    let mut c = interactive(&settings)?;
+    let mut c = base(&settings)?;
     let o = crate::platform::output(
         c.args(["--dump-single-json", "--skip-download", "--", &normalized])
             .stdout(Stdio::piped())
@@ -93,7 +93,7 @@ pub fn retrieve(
     )
     .map_err(|_| "Cannot save temporary metadata")?;
     let template = dir.0.join("captions.%(ext)s");
-    let mut c = interactive(&settings)?;
+    let mut c = base(&settings)?;
     c.args([
         "--skip-download",
         "--sub-format",

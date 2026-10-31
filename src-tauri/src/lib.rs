@@ -50,15 +50,9 @@ fn auth(c: &mut std::process::Command, s: &Settings) -> Result<(), String> {
     }
     Ok(())
 }
-/// yt-dlp command for downloads: spaces out requests to avoid rate limits.
+/// yt-dlp command shared by lookups and downloads. Requests are not artificially delayed;
+/// the queue's cooldown spaces consecutive downloads instead.
 fn base(s: &Settings) -> Result<std::process::Command, String> {
-    command(s, true)
-}
-/// yt-dlp command for a single user-initiated lookup (captions, analysis): no artificial sleeps.
-fn interactive(s: &Settings) -> Result<std::process::Command, String> {
-    command(s, false)
-}
-fn command(s: &Settings, throttle: bool) -> Result<std::process::Command, String> {
     let mut c = platform::command("yt-dlp")?;
     c.args([
         "--ignore-config",
@@ -76,9 +70,6 @@ fn command(s: &Settings, throttle: bool) -> Result<std::process::Command, String
         "--compat-options",
         "prefer-legacy-http-handler",
     ]);
-    if throttle {
-        c.args(["--sleep-requests", "3"]);
-    }
     if let Ok(p) = platform::binary("ffmpeg") {
         c.arg("--ffmpeg-location").arg(p.parent().unwrap());
     }
@@ -219,7 +210,7 @@ async fn analyze(
     }
     let process = analyzer.clone();
     let result=tauri::async_runtime::spawn_blocking(move || ->Result<serde_json::Value,String> {
-        let mut command=interactive(&settings)?;
+        let mut command=base(&settings)?;
         command.args(["--dump-single-json","--skip-download","--",&normalized]).stdout(Stdio::piped()).stderr(Stdio::piped());
         let child=platform::spawn(&mut command).map_err(|_|"Cannot start yt-dlp")?;
         *process.lock().unwrap_or_else(|e| e.into_inner())=Some(child.id());
@@ -1214,15 +1205,13 @@ mod error_tests {
         assert_eq!(&b[a.len()..], ["--cookies-from-browser", "edge"]);
     }
     #[test]
-    fn lookups_do_not_sleep_but_downloads_do() {
-        let args = |c: std::process::Command| {
-            c.get_args()
-                .map(|a| a.to_string_lossy().into_owned())
-                .collect::<Vec<_>>()
-        };
-        let s = Settings::default();
-        assert!(!args(interactive(&s).unwrap()).contains(&"--sleep-requests".to_string()));
-        assert!(args(base(&s).unwrap()).contains(&"--sleep-requests".to_string()));
+    fn requests_are_not_artificially_delayed() {
+        let args = base(&Settings::default())
+            .unwrap()
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(!args.iter().any(|a| a.starts_with("--sleep")));
     }
     #[test]
     fn sensitive_diagnostics_are_not_reflected() {
