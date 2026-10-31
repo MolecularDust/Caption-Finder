@@ -247,6 +247,22 @@ pub fn output_file_name(input: &str, container: &str) -> Result<String, String> 
                 .into(),
         );
     }
+    #[cfg(windows)]
+    {
+        let device = stem.split('.').next().unwrap_or("").to_ascii_uppercase();
+        if stem.ends_with(' ')
+            || stem.contains(['<', '>', '"', '|', '?', '*'])
+            || ["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"].contains(&device.as_str())
+            || (device.len() == 4
+                && (device.starts_with("COM") || device.starts_with("LPT"))
+                && device.as_bytes()[3].is_ascii_digit()
+                && device.as_bytes()[3] != b'0')
+        {
+            return Err(
+                "This file name is reserved or contains characters Windows cannot save.".into(),
+            );
+        }
+    }
     Ok(format!("{stem}.{container}"))
 }
 #[cfg(test)]
@@ -361,6 +377,35 @@ mod cooldown_tests {
             (12000, 0),
         ] {
             assert_eq!(cooldown_seconds(Some(Duration::from_millis(ms))), expected);
+        }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_sentence_filename_tests {
+    use super::*;
+    #[test]
+    fn final_sentence_period_is_valid_before_appended_extension() {
+        let name = output_file_name(
+            "Oh. I'm gonna earmuff my grandma when she watches this.",
+            "mp4",
+        )
+        .unwrap();
+        assert_eq!(
+            name,
+            "Oh. I'm gonna earmuff my grandma when she watches this..mp4"
+        );
+        let dir = std::env::temp_dir().join(format!("youglish-filename-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join(name), b"test").unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn windows_reserved_devices_and_invalid_characters_remain_rejected() {
+        for name in [
+            "CON", "CON.", "NUL.mp4", "COM1", "LPT9", "CON .mp4", "a?b", "a*b", "a|b", "a<b",
+        ] {
+            assert!(output_file_name(name, "mp4").is_err(), "{name}");
         }
     }
 }

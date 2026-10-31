@@ -47,12 +47,18 @@ pub fn retrieve(
         return Err("Unsupported caption language code".into());
     }
     let mut c = base(&settings)?;
-    let o = c
-        .args(["--dump-single-json", "--skip-download", "--", &normalized])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|_| "Cannot start caption worker")?;
+    let o = crate::platform::output(
+        c.args(["--dump-single-json", "--skip-download", "--", &normalized])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .map_err(|_| "Cannot start caption worker")?;
+    crate::diagnostics::log(
+        crate::diagnostics::Stage::CaptionMetadata,
+        &settings,
+        o.status.code(),
+        &String::from_utf8_lossy(&o.stderr),
+    );
     if !o.status.success() {
         return Err(format!(
             "Caption request: {}",
@@ -102,13 +108,14 @@ pub fn retrieve(
     } else {
         "--write-subs"
     });
-    let o = c
-        .arg("-o")
-        .arg(template)
-        .arg("--load-info-json")
-        .arg(&info)
-        .output()
+    let o = crate::platform::output(c.arg("-o").arg(template).arg("--load-info-json").arg(&info))
         .map_err(|_| "Cannot retrieve captions")?;
+    crate::diagnostics::log(
+        crate::diagnostics::Stage::Captions,
+        &settings,
+        o.status.code(),
+        &String::from_utf8_lossy(&o.stderr),
+    );
     if !o.status.success() {
         return Err(format!(
             "Caption request: {}",
@@ -157,5 +164,26 @@ mod tests {
         let v =
             json!({"automatic_captions":{"en":[{"url":"https://example.org/a?lang=es&tlang=en"}]}});
         assert_eq!(track(&v, "en"), None);
+    }
+}
+
+#[cfg(test)]
+mod network_tests {
+    use super::*;
+    #[test]
+    #[ignore = "Requires network access and pinned media tools"]
+    fn windows_public_caption_workflow() {
+        let cache =
+            std::env::temp_dir().join(format!("youglish-caption-smoke-{}", uuid::Uuid::new_v4()));
+        let result = retrieve(
+            "https://www.youtube.com/watch?v=H14bBuluwB8".into(),
+            "en".into(),
+            Settings::default(),
+            cache.clone(),
+        )
+        .unwrap();
+        assert!(!result["track"]["cues"].as_array().unwrap().is_empty());
+        assert_eq!(std::fs::read_dir(&cache).unwrap().count(), 0);
+        std::fs::remove_dir(cache).unwrap();
     }
 }

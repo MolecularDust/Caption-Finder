@@ -1,14 +1,19 @@
 use std::{path::PathBuf, process::Command};
 pub fn binary(name: &str) -> Result<PathBuf, String> {
+    let name = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
     let exe = std::env::current_exe().map_err(|_| "Cannot locate application")?;
-    let bundled = exe.parent().unwrap().join(name);
+    let bundled = exe.parent().unwrap().join(&name);
     if bundled.is_file() {
         return Ok(bundled);
     }
     if cfg!(debug_assertions) {
         let local = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../.tools/bin")
-            .join(name);
+            .join(&name);
         if local.is_file() {
             return Ok(local);
         }
@@ -16,7 +21,7 @@ pub fn binary(name: &str) -> Result<PathBuf, String> {
             PathBuf::from("/opt/homebrew/bin"),
             PathBuf::from("/usr/local/bin"),
         ]) {
-            let p = dir.join(name);
+            let p = dir.join(&name);
             if p.is_file() {
                 return Ok(p);
             }
@@ -35,6 +40,11 @@ pub fn command(name: &str) -> Result<Command, String> {
         .parent()
         .unwrap()
         .join("../Resources/resources/cacert.pem");
+    let bundled_ca = if cfg!(windows) {
+        exe.parent().unwrap().join("resources/cacert.pem")
+    } else {
+        bundled_ca
+    };
     let ca = if bundled_ca.is_file() {
         bundled_ca
     } else if cfg!(debug_assertions) {
@@ -49,6 +59,19 @@ pub fn command(name: &str) -> Result<Command, String> {
     {
         use std::os::unix::process::CommandExt;
         c.process_group(0);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        if portable() {
+            let data = data_dir()?;
+            let temp = data.join("Temp");
+            std::fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
+            c.env("TEMP", &temp)
+                .env("TMP", &temp)
+                .env("DENO_DIR", data.join("Deno"));
+        }
     }
     Ok(c)
 }
@@ -65,10 +88,14 @@ pub fn signal(pid: u32, action: &str) -> Result<(), String> {
         }
         Ok(())
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        windows_process::signal(pid, action)
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = (pid, action);
-        Err("Process control not yet supported on this platform".into())
+        Err("Unsupported platform".into())
     }
 }
 #[cfg(all(test, unix))]
@@ -95,4 +122,89 @@ mod tests {
         signal(pid, "cancel").unwrap();
         assert_eq!(child.wait().unwrap().signal(), Some(libc::SIGKILL));
     }
+}
+
+#[cfg(windows)]
+mod windows_process;
+
+pub fn portable() -> bool {
+    cfg!(windows)
+        && std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.join("portable.marker").is_file()))
+            .unwrap_or(false)
+}
+pub fn data_dir() -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let data = exe
+        .parent()
+        .ok_or("Application directory unavailable")?
+        .join("Data");
+    std::fs::create_dir_all(&data).map_err(|_| "Portable application directory is not writable. Move the entire folder to a writable directory.".to_string())?;
+    Ok(data)
+}
+
+pub fn installed_browsers() -> Vec<String> {
+    #[cfg(windows)]
+    {
+        let roots = [
+            "LOCALAPPDATA",
+            "APPDATA",
+            "PROGRAMFILES",
+            "PROGRAMFILES(X86)",
+        ]
+        .iter()
+        .filter_map(std::env::var_os)
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+        return [
+            ("chrome", "Google/Chrome/Application/chrome.exe"),
+            ("edge", "Microsoft/Edge/Application/msedge.exe"),
+            ("firefox", "Mozilla Firefox/firefox.exe"),
+            ("brave", "BraveSoftware/Brave-Browser/Application/brave.exe"),
+            ("chromium", "Chromium/Application/chrome.exe"),
+            ("vivaldi", "Vivaldi/Application/vivaldi.exe"),
+            ("opera", "Programs/Opera/opera.exe"),
+            ("opera", "Opera/opera.exe"),
+        ]
+        .iter()
+        .filter(|(_, p)| roots.iter().any(|r| r.join(p).is_file()))
+        .map(|(id, _)| id.to_string())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    }
+    #[cfg(not(windows))]
+    {
+        let roots = [
+            PathBuf::from("/Applications"),
+            PathBuf::from("/System/Applications"),
+            PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join("Applications"),
+        ];
+        [
+            ("opera", "Opera.app"),
+            ("chrome", "Google Chrome.app"),
+            ("firefox", "Firefox.app"),
+            ("safari", "Safari.app"),
+            ("edge", "Microsoft Edge.app"),
+            ("brave", "Brave Browser.app"),
+            ("chromium", "Chromium.app"),
+            ("vivaldi", "Vivaldi.app"),
+        ]
+        .iter()
+        .filter(|(_, p)| roots.iter().any(|r| r.join(p).is_dir()))
+        .map(|(id, _)| id.to_string())
+        .collect()
+    }
+}
+
+#[cfg(windows)]
+pub use windows_process::{output, spawn};
+#[cfg(not(windows))]
+pub fn spawn(c: &mut Command) -> std::io::Result<std::process::Child> {
+    c.spawn()
+}
+#[cfg(not(windows))]
+pub fn output(c: &mut Command) -> std::io::Result<std::process::Output> {
+    c.output()
 }

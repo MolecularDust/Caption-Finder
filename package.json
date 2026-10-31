@@ -13,7 +13,9 @@
     "package": "node scripts/package-macos.mjs",
     "prepare:sidecars": "node scripts/prepare-sidecars.mjs",
     "format": "prettier --write src scripts docs README.md",
-    "package:dev": "npm run prepare:sidecars && node scripts/desktop.mjs build --debug --bundles app --config src-tauri/tauri.dev-bundle.conf.json"
+    "package:dev": "npm run prepare:sidecars && node scripts/desktop.mjs build --debug --bundles app --config src-tauri/tauri.dev-bundle.conf.json",
+    "package:portable": "node scripts/package-windows-portable.mjs",
+    "package:windows": "npm run prepare:sidecars && node scripts/desktop.mjs build --bundles nsis --config src-tauri/tauri.windows.conf.json"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8",

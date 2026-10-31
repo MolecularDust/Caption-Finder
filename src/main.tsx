@@ -1337,7 +1337,7 @@ function App() {
                     <button
                       onClick={() => act(() => invoke("reveal", { id: j.id }))}
                     >
-                      Reveal in Finder
+                      Reveal file
                     </button>
                   ) : j.state === "failed" ? (
                     <button
@@ -1472,7 +1472,8 @@ function App() {
             </Field>
             <p className="notice">
               Selecting the app’s session uses only its YouTube cookies in a temporary file, removed when the operation finishes. Selecting another browser authorizes yt-dlp to read its cookies when you
-              analyze or download. macOS may request Keychain or cookie-store
+              analyze or download. Your operating system may request browser cookie-store
+
               access. Cookies are never printed or copied into app settings, or
               injected into YouGlish. This setting controls subtitle retrieval
               and downloads; the widget uses its own WebView session.
