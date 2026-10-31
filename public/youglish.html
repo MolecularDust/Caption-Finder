@@ -1,13 +1,10 @@
 <!doctype html><html><head><meta name="referrer" content="strict-origin-when-cross-origin"><meta charset="utf-8"><style>html,body{margin:0;background:#fff;color:#262833;font:16px system-ui}#widget{width:100%}#preview{display:none}#preview-player{width:100%;height:470px}button{padding:10px 20px;margin:8px;cursor:pointer}#status{padding:12px;color:#676d7a}</style></head><body><div id="status">Loading YouGlish…</div><div id="widget"></div><div id="preview"><button id="back">← Back to YouGlish results</button><div id="preview-player"></div></div><script>
 const q=new URLSearchParams(location.search),token=q.get('token');let widget,yt,videoId='',previewing=false,playerState=-1,pendingSeek=0,pendingPlay=false,ytApiReady=false;
 function send(type,value){parent.postMessage({token,type,value},'*')}
-// Retain the actual expanded caption height, without adding spare blank space.
-// Preview has its own height; returning to results restores the reserved space.
-let lastHeight=0,reservedWidgetHeight=0;
+// Follow the current widget height so collapsed captions leave no reserved gap.
+let lastHeight=0;
 function reportHeight(){
- const measured=Math.ceil(document.body.getBoundingClientRect().height)+2;
- if(!previewing && measured>reservedWidgetHeight)reservedWidgetHeight=measured;
- const height=previewing ? measured : reservedWidgetHeight;
+ const height=Math.ceil(document.body.getBoundingClientRect().height)+2;
  if(height!==lastHeight){lastHeight=height;send('height',height)}
 }
 new ResizeObserver(reportHeight).observe(document.body);
@@ -16,11 +13,11 @@ function status(text){document.getElementById('status').textContent=text}
 function onYouglishAPIReady(){
  widget=new YG.Widget('widget',{width:Math.min(920,document.documentElement.clientWidth),components:4+8+16+64+8192,autoStart:1,events:{
  onFetchDone:e=>{send('fetch',e.totalResult);status(e.totalResult ? '' : 'No results found.')},
- onVideoChange:e=>{if(!/^[\w-]{11}$/.test(e.video))return;videoId=e.video;send('video',videoId)},
+ onVideoChange:e=>{if(!/^[\w-]{11}$/.test(e.video))return;videoId=e.video;status('');send('video',videoId)},
  onCaptionChange:e=>send('caption',e.caption),
  onPlayerReady:()=>send('ready',true),
- onPlayerStateChange:e=>{playerState=e.state;if(!previewing)send('state',e.state)},
- onError:e=>{status('YouGlish widget error '+e.code+'. Search could not finish.');send('widget-error',e.code)}
+ onPlayerStateChange:e=>{playerState=e.state;if(e.state===1)status('');if(!previewing)send('state',e.state)},
+ onError:e=>{status('');send('widget-error',e.code)}
  }});
  const query=(q.get('query')||'').trim();
  if(!query){status('Enter a word or phrase to search YouGlish.');return}

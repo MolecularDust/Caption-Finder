@@ -3,6 +3,7 @@ mod download_files;
 mod model;
 mod platform;
 mod player;
+mod session;
 use model::*;
 use std::{
     collections::HashMap,
@@ -171,6 +172,7 @@ async fn caption_track(
     s: State<'_, Backend>,
 ) -> Result<serde_json::Value, String> {
     let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
     let cache = app
         .path()
         .app_cache_dir()
@@ -185,9 +187,14 @@ fn player_origin(s: State<Backend>) -> String {
     s.origin.clone()
 }
 #[tauri::command]
-async fn analyze(url: String, s: State<'_, Backend>) -> Result<serde_json::Value, String> {
+async fn analyze(
+    app: tauri::AppHandle,
+    url: String,
+    s: State<'_, Backend>,
+) -> Result<serde_json::Value, String> {
     let normalized = normalize(&url)?;
     let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
     let analyzer = s.analyzer.clone();
     {
         let mut active = analyzer.lock().unwrap();
@@ -724,7 +731,11 @@ fn normalize_fast(
 }
 
 #[tauri::command]
-fn enqueue(app: tauri::AppHandle, s: State<Backend>, request: Request) -> Result<String, String> {
+async fn enqueue(
+    app: tauri::AppHandle,
+    s: State<'_, Backend>,
+    request: Request,
+) -> Result<String, String> {
     validate(&request)?;
     if !PathBuf::from(&request.destination).is_dir() {
         return Err("Choose an existing destination folder".into());
@@ -749,9 +760,10 @@ fn enqueue(app: tauri::AppHandle, s: State<Backend>, request: Request) -> Result
         request,
         hidden: false,
     };
+    let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
     s.jobs.lock().unwrap().insert(id.clone(), job.clone());
     let _ = app.emit("job", job);
-    let settings = s.settings.lock().unwrap().clone();
     s.sender
         .send((id.clone(), settings))
         .map_err(|_| "Download worker is unavailable")?;
@@ -804,7 +816,7 @@ fn clear_completed(s: State<Backend>) -> Vec<String> {
     clear_finished(&mut s.jobs.lock().unwrap())
 }
 #[tauri::command]
-fn retry(app: tauri::AppHandle, s: State<Backend>, id: String) -> Result<String, String> {
+async fn retry(app: tauri::AppHandle, s: State<'_, Backend>, id: String) -> Result<String, String> {
     let request = {
         let map = s.jobs.lock().unwrap();
         let j = map.get(&id).ok_or("Unknown download")?;
@@ -813,7 +825,7 @@ fn retry(app: tauri::AppHandle, s: State<Backend>, id: String) -> Result<String,
         }
         j.request.clone()
     };
-    enqueue(app, s, request)
+    enqueue(app, s, request).await
 }
 #[tauri::command]
 fn reveal(s: State<Backend>, id: String) -> Result<(), String> {
@@ -832,6 +844,128 @@ fn reveal(s: State<Backend>, id: String) -> Result<(), String> {
     #[cfg(not(target_os = "macos"))]
     return Err("Reveal is not implemented for this platform".into());
     Ok(())
+}
+/// Open the official site as the top-level document for a playback comparison.
+/// No IPC capabilities are granted to this remote-content window.
+#[tauri::command]
+fn test_youglish_window(
+    app: tauri::AppHandle,
+    phrase: String,
+    language: String,
+    accent: String,
+) -> Result<(), String> {
+    let url = youglish_test_url(&phrase, &language, &accent)?;
+    show_session_window(app, url)
+}
+
+/// Use the same persistent, non-incognito webview as the playback test.
+/// Authentication happens on Google's pages; no credentials are read by the app.
+#[tauri::command]
+fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
+    show_session_window(
+        app,
+        url::Url::parse("https://accounts.google.com/").unwrap(),
+    )
+}
+
+#[tauri::command]
+fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
+    show_session_window(
+        app,
+        url::Url::parse("https://www.youtube.com/watch?v=I2xDZlpInik&t=1034s").unwrap(),
+    )
+}
+
+#[tauri::command]
+fn youtube_connect_window(app: tauri::AppHandle) -> Result<(), String> {
+    show_session_window(
+        app,
+        url::Url::parse("https://www.youtube.com/signin").unwrap(),
+    )
+}
+
+fn show_session_window(app: tauri::AppHandle, url: url::Url) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("youglish-test") {
+        window
+            .navigate(url)
+            .map_err(|_| "Could not load session page")?;
+        window.show().map_err(|_| "Could not show session window")?;
+        window
+            .set_focus()
+            .map_err(|_| "Could not focus session window")?;
+    } else {
+        // Default persistent website store is shared by app webviews. Remote
+        // content has no Tauri IPC capability. Do not use an ephemeral profile.
+        tauri::WebviewWindowBuilder::new(&app, "youglish-test", tauri::WebviewUrl::External(url))
+            .title("YouGlish Downloader — YouTube account")
+            .inner_size(1080., 900.)
+            .build()
+            .map_err(|_| "Could not open the account window")?;
+    }
+    Ok(())
+}
+
+fn youglish_test_url(phrase: &str, language: &str, accent: &str) -> Result<url::Url, String> {
+    if phrase.trim().is_empty()
+        || phrase.len() > 1000
+        || language.is_empty()
+        || !language.bytes().all(|b| b.is_ascii_lowercase())
+        || !accent.bytes().all(|b| b.is_ascii_lowercase())
+    {
+        return Err("Enter a phrase and select a language and accent".into());
+    }
+    let mut url = url::Url::parse("https://youglish.com").unwrap();
+    url.path_segments_mut().unwrap().extend([
+        "pronounce",
+        phrase.trim(),
+        language,
+        if accent.is_empty() { "all" } else { accent },
+    ]);
+    Ok(url)
+}
+#[cfg(test)]
+mod youglish_window_tests {
+    use super::*;
+    #[test]
+    fn test_window_stays_on_official_host_and_encodes_query() {
+        let url = youglish_test_url("hello / café? # & world", "english", "us").unwrap();
+        assert_eq!(url.host_str(), Some("youglish.com"));
+        assert!(url.query().is_none());
+        assert!(url.fragment().is_none());
+        assert_eq!(url.path_segments().unwrap().count(), 4);
+        assert!(youglish_test_url("hello", "english/evil", "us").is_err());
+        assert!(youglish_test_url("", "english", "").is_err());
+        assert!(youglish_test_url("hi", "english", "")
+            .unwrap()
+            .path()
+            .ends_with("/all"));
+    }
+}
+#[tauri::command]
+fn open_youtube(url: String) -> Result<(), String> {
+    let url = normalize(&url)?;
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("/usr/bin/open");
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut c = std::process::Command::new("rundll32.exe");
+        c.arg("url.dll,FileProtocolHandler");
+        c
+    };
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let mut command = std::process::Command::new("xdg-open");
+    command
+        .arg(url)
+        .spawn()
+        .map_err(|_| "Could not open your browser".to_string())?;
+    Ok(())
+}
+#[tauri::command]
+fn copy_youtube_link(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    app.clipboard()
+        .write_text(normalize(&url)?)
+        .map_err(|_| "Could not copy the video link".to_string())
 }
 #[tauri::command]
 fn read_clipboard(app: tauri::AppHandle) -> Result<String, String> {
@@ -896,6 +1030,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_clipboard,
+            open_youtube,
+            test_youglish_window,
+            youtube_sign_in_window,
+            youtube_connect_window,
+            youtube_playback_test,
+            copy_youtube_link,
             get_settings,
             installed_browsers,
             save_settings,

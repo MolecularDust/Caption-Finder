@@ -183,3 +183,34 @@ export function stepPaddedLength(
   const target = Math.min(duration, paddedEnd + delta);
   return Math.min(duration, Math.max(start + 0.01, target - padding));
 }
+
+/** Portable filename stem; preserve Unicode while respecting the backend's byte limit. */
+export function safeFileName(input: string): string {
+  let name = input.trim().replace(/\.(mp4|mkv)$/i, "");
+  name = Array.from(name)
+    .filter(
+      (c) =>
+        c.codePointAt(0)! > 31 &&
+        c.codePointAt(0)! !== 127 &&
+        !'<>:"/\\|?*'.includes(c),
+    )
+    .join("");
+  name = name.trim().replace(/[. ]+$/, "");
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(name))
+    name = `_${name}`;
+  let result = "";
+  for (const c of name) {
+    if (new TextEncoder().encode(result + c).length > 180) break;
+    result += c;
+  }
+  return result.trim().replace(/[. ]+$/, "") || "Speech sample";
+}
+export function fileNameNeedsFix(input: string): boolean {
+  const stem = input.trim().replace(/\.(mp4|mkv)$/i, "");
+  return (
+    stem !== safeFileName(input) ||
+    Array.from(input).some(
+      (c) => c.codePointAt(0)! < 32 || c.codePointAt(0)! === 127,
+    )
+  );
+}

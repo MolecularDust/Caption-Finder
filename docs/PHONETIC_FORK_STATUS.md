@@ -115,3 +115,49 @@ Clear Finished (renamed from Clear Completed) now clears completed, failed, and 
 - Serialized queue waits ten seconds after the preceding attempt finishes (success, failure, or cancellation) before starting another, including retries. First attempt is immediate. Waiting job displays a rounded-up countdown, can be canceled, and cannot be paused until running.
 - Validation: 25 frontend tests, 18 Rust tests, lint and desktop bundle build passed. Local HTTP fixture with bundled yt-dlp verified both supplied/automatic tracks requested only the caption endpoint using saved metadata, no extraction/media request. No live YouTube requests were needed for this validation.
 - Rebuilt debug bundle; running app not restarted so current browsing/queue state is preserved. Restart to load changes.
+
+## 2026-10-30 — Error pop-ups and filename repair
+
+Replaced the general error banner with an accessible modal dialog (focus containment and Escape dismissal). Before queueing an invalid custom filename, show original and proposed names with Cancel / Fix name. Applying a fix changes only the filename and leaves queueing as a separate deliberate action. Portable sanitation strips incompatible characters and controls, protects Windows reserved names, removes trailing dots, supplies an empty-name fallback and truncates on Unicode boundaries to 180 UTF-8 bytes. Captions remain cached for subsequent phrase matching.
+
+Validation: 27 frontend tests, lint, build, and macOS debug bundle passed. Existing running app left alone; restart to load the updated build.
+
+## 2026-10-30 — Direct YouGlish window comparison
+
+Added a diagnostic button below the search form that opens the official YouGlish website as a top-level WebView, using the entered phrase/language/accent. Remote window has no added IPC capabilities; it is separate from clip selection. Reopening reuses the test window. URL construction restricts origin and encodes path segments.
+
+Frontend tests (27), Rust tests (19), lint and macOS debug bundle passed. Native UI test with `see your`, English/US, result 1 (I2xDZlpInik) loaded the full YouGlish site but YouTube still displayed “Sign in to confirm you’re not a bot”. Thus removing the local iframe layers alone did not fix the issue; this does not distinguish browser runtime from session/account differences. Left test window open for user comparison. Screenshot: direct-youglish-test.png (local only).
+
+### 2026-10-30 — persistent session sign-in test
+- Added Sign in to YouTube beside the diagnostic YouGlish button. Both navigate the same `youglish-test` window using the default persistent website store; remote content receives no IPC capabilities.
+- Rebuilt and launched the app. Opened YouTube directly and clicked its Sign in link. Google's actual accounts.google.com email/phone sign-in page loaded successfully. User authentication and subsequent playback/restart persistence checks remain pending.
+- Downloader cookie handling is unchanged; this is a playback session test, not yet downloader session integration.
+- Validation: lint, frontend build, 27 frontend tests, 19 Rust tests, native debug app bundle passed.
+
+### Cookie diagnostic result
+- Added a localhost-only cookie diagnostic in the same session window. It reads only `yg_storage_probe`, never Google cookies.
+- Verified live: navigator.cookieEnabled=true; a persistent test cookie was readable immediately, on a second page, and after quitting/relaunching the app (new localhost port). The exact test value survived. Removed test cookie afterward and verified ABSENT.
+- This rules out globally disabled cookie storage or general persistence failure. It does NOT test Google's secure/HttpOnly cookies or cross-site login redirects; the cause of Google's cookie error remains unresolved.
+- Lint and native debug bundle build passed.
+
+### 2026-10-31 — resumed direct YouTube test
+- Direct watch page for I2xDZlpInik loaded signed out and played from 17:14 to 17:17 inside the diagnostic window.
+- Clicking YouTube Sign in recognized saved Google login and presented channel selection without credentials. Selected Tomaten Paste (the user's previously shown channel); YouTube then displayed Account menu/Notifications instead of Sign in.
+- Reopened full YouGlish for see your / US: first sample loaded and Play produced Pause video. Main embedded widget also loaded the same sample and Play produced Pause video. No bot error on this sample in either context today.
+- Limited result: not proof that sign-in caused the playback improvement (direct playback already worked signed out today; YouTube locale changed DE yesterday to RU today). Broad browsing reliability, YouTube-session restart persistence and downloader authentication remain unverified.
+
+### 2026-10-31 — integrated playback account controls
+- User reported 50 consecutive samples without playback errors.
+- Removed diagnostic buttons from main search; removed localhost cookie test route and page.
+- Account & Settings now provides Sign in to Google, Connect YouTube (official /signin route), and Check playback. Explains channel selection, reload, and account-menu sign-out.
+- Verified Connect YouTube opens authenticated YouTube with Account menu. Persistent account store and restricted remote-window capabilities preserved.
+- Existing subtitle/download authentication remains separate; app cookies are not exported to yt-dlp in this change.
+- Lint, 27 frontend tests, frontend build and native debug bundle passed.
+
+### 2026-10-31 — yt-dlp uses app session, verified
+- Added App’s YouTube session download-authentication option and selected it for the live test. Metadata, subtitle retrieval, enqueue and retry prepare independent snapshots of the app’s YouTube cookies; unrelated domains are excluded.
+- Runtime-only Arc guard retains each private temporary Netscape file through the operation/queue and removes it afterward. Cookie values and temporary paths are not serialized into settings. Unix files created with 0600; abrupt process termination can leave a temporary file (normal completion/failure/cancel release their guards).
+- Corrected Wry cookies_for_url exact-domain filtering by reading the store then applying a strict youtube.com domain filter locally. No cookie values logged.
+- Live lookup: Di0X3qWYAR8 supplied English captions found 1115.825–1118.075; padded selection 6.25s.
+- Live download completed: /Users/mike/Documents/Weak Forms/Pronouns/you/App session test 2026-10-31.mp4. ffprobe confirmed audio + 1280x720 video, 6.269 seconds, 746803 bytes. No temporary session files remained.
+- Validation: 21 Rust tests, 27 frontend tests, lint, frontend/native build passed. App-session authentication remains selected. Browser imports retained as optional fallback. Windows permissions/runtime behavior not yet tested.

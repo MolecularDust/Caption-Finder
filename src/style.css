@@ -1050,3 +1050,64 @@ fieldset.clip-controls:disabled,
 .disabled-control {
   opacity: 0.45;
 }
+
+.error-popup {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 28px;
+  background: var(--panel);
+  color: inherit;
+  box-shadow: 0 20px 80px #0004;
+}
+.error-popup::backdrop {
+  background: #0006;
+}
+.error-popup h2 {
+  margin-top: 0;
+}
+.error-popup p {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.filename-comparison dt {
+  font-weight: 650;
+  margin-top: 18px;
+}
+.filename-comparison dd {
+  margin: 8px 0 0;
+  padding: 12px;
+  background: var(--input);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.error-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.external-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin: 4px 0 16px;
+  font-size: 12px;
+}
+.playback-test-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.playback-test-actions small {
+  color: var(--muted);
+  font-size: 12px;
+}

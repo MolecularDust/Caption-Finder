@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  safeFileName,
+  fileNameNeedsFix,
   timestamp,
   preciseTimestamp,
   parseTimestamp,
@@ -141,6 +143,10 @@ function App() {
     [video, setVideo] = useState<Video | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [nameFix, setNameFix] = useState<{
+      original: string;
+      proposed: string;
+    } | null>(null),
     [playerError, setPlayerError] = useState(""),
     [origin, setOrigin] = useState(""),
     [ready, setReady] = useState(false),
@@ -196,6 +202,7 @@ function App() {
   const act = async (fn: () => Promise<unknown>) => {
     try {
       setError("");
+      setNameFix(null);
       await fn();
     } catch (e) {
       setError(String(e));
@@ -321,7 +328,13 @@ function App() {
       if (type === "preview") setPreviewMode(!!value);
       if (type === "widget-error")
         setPlayerError(
-          "YouGlish could not load this sample; try the next result.",
+          value === 1
+            ? "YouTube could not play this sample. Check the message in the player for details, or try the next result. The downloader’s cookies setting does not sign in this player."
+            : value === 2
+              ? "YouGlish reports that this browser is unsupported. Try the YouGlish website in your browser."
+              : value === 3
+                ? "YouGlish timed out. Check your connection and try searching again."
+                : `YouGlish reported an error (${value}). Try another sample or search again.`,
         );
       if (type === "time") {
         if (
@@ -357,6 +370,7 @@ function App() {
         previewing.current = false;
         setPreviewActive(false);
       }
+      if (type === "state" && value === 1) setPlayerError("");
       if (type === "ready") setReady(true);
       if (type === "error") {
         setReady(false);
@@ -517,6 +531,13 @@ function App() {
     act(async () => {
       if (!video || !selectionValid)
         throw Error("Select a valid video section.");
+      if (fileNameEdited && fileNameNeedsFix(fileName)) {
+        setNameFix({ original: fileName, proposed: safeFileName(fileName) });
+        setError(
+          "This file name contains unsupported characters, is empty, or is too long. Review the suggested name below.",
+        );
+        return;
+      }
       await invoke("enqueue", {
         request: {
           url: video.url,
@@ -582,7 +603,7 @@ function App() {
           <span className="badge">
             ●{" "}
             {settings.browser || settings.cookiesFile
-              ? "Browser session"
+              ? settings.browser === "app" ? "App session" : "Browser session"
               : "Anonymous"}
           </span>
         </div>
@@ -613,6 +634,9 @@ function App() {
           >
             <input
               id="phrase"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={phrase}
               onChange={(e) => setPhrase(e.target.value)}
               placeholder="Enter a word or phrase"
@@ -648,13 +672,8 @@ function App() {
               Search →
             </button>
           </form>
+
         </section>
-        {error && (
-          <div className="notice error" role="alert">
-            {error}
-            <button onClick={() => setError("")}>×</button>
-          </div>
-        )}
         <section className="video-card">
           <div className="video-info">
             <div>
@@ -696,6 +715,32 @@ function App() {
               </div>
             )}
           </div>
+          {candidate && (
+            <div className="external-video-actions">
+              <button
+                onClick={() =>
+                  act(() =>
+                    invoke("open_youtube", {
+                      url: `https://www.youtube.com/watch?v=${candidate}`,
+                    }),
+                  )
+                }
+              >
+                Open in YouTube ↗
+              </button>
+              <button
+                onClick={() =>
+                  act(() =>
+                    invoke("copy_youtube_link", {
+                      url: `https://www.youtube.com/watch?v=${candidate}`,
+                    }),
+                  )
+                }
+              >
+                Copy link
+              </button>
+            </div>
+          )}
           {playerError && <div className="notice error">{playerError}</div>}
           <div className="trim">
             <fieldset className="trim-details" disabled={!candidate}>
@@ -1336,6 +1381,25 @@ function App() {
           <span>Made for your personal library.</span>
         </footer>
       </main>
+      {error && (
+        <ErrorPopup
+          message={error}
+          nameFix={nameFix}
+          onClose={() => {
+            setError("");
+            setNameFix(null);
+          }}
+          onFix={() => {
+            if (nameFix) {
+              setFileName(nameFix.proposed);
+              setFileNameEdited(true);
+              dirtyName.current = true;
+            }
+            setError("");
+            setNameFix(null);
+          }}
+        />
+      )}
       {showSettings && (
         <div className="modal-backdrop">
           <section
@@ -1348,11 +1412,20 @@ function App() {
               <h2>Account & Settings</h2>
               <button onClick={() => setShowSettings(false)}>Done</button>
             </div>
+            <h3>YouGlish playback account</h3>
+            <p>Sign in to Google first, then connect YouTube and select your channel if asked. Close the account window when finished and search again to reload the player.</p>
+            <div className="playback-test-actions">
+              <button onClick={() => act(() => invoke("youtube_sign_in_window"))}>1. Sign in to Google ↗</button>
+              <button onClick={() => act(() => invoke("youtube_connect_window"))}>2. Connect YouTube ↗</button>
+              <button onClick={() => act(() => invoke("youtube_playback_test"))}>Check playback ↗</button>
+            </div>
+            <p>Your login is kept in the app’s browser storage. On YouTube, an account avatar confirms sign-in; use its account menu to switch accounts or sign out. A successful check plays a sample video in that window.</p>
+            <h3>Subtitle and download authentication</h3>
             <p>
               Use an existing browser session for videos you’re authorized to
               access. Anonymous is the default.
             </p>
-            <Field label="Authentication">
+            <Field label="Download authentication">
               <select
                 value={settings.browser || (settings.cookiesFile ? "file" : "")}
                 onChange={(e) =>
@@ -1375,6 +1448,7 @@ function App() {
                 }
               >
                 <option value="">Anonymous</option>
+                <option value="app">App’s YouTube session</option>
                 {browsers.map((browser) => (
                   <option key={browser} value={browser}>
                     {
@@ -1397,7 +1471,7 @@ function App() {
               </select>
             </Field>
             <p className="notice">
-              Selecting a browser authorizes yt-dlp to read its cookies when you
+              Selecting the app’s session uses only its YouTube cookies in a temporary file, removed when the operation finishes. Selecting another browser authorizes yt-dlp to read its cookies when you
               analyze or download. macOS may request Keychain or cookie-store
               access. Cookies are never printed or copied into app settings, or
               injected into YouGlish. This setting controls subtitle retrieval
@@ -1528,3 +1602,53 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+
+function ErrorPopup({
+  message,
+  nameFix,
+  onClose,
+  onFix,
+}: {
+  message: string;
+  nameFix: { original: string; proposed: string } | null;
+  onClose: () => void;
+  onFix: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="error-popup"
+      aria-labelledby="error-title"
+      aria-describedby="error-message"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <h2 id="error-title">
+        {nameFix ? "Fix file name" : "Something went wrong"}
+      </h2>
+      <p id="error-message">{message}</p>
+      {nameFix && (
+        <dl className="filename-comparison">
+          <dt>Original name</dt>
+          <dd>{nameFix.original || "(empty)"}</dd>
+          <dt>Proposed name</dt>
+          <dd>{nameFix.proposed}</dd>
+        </dl>
+      )}
+      <div className="error-popup-actions">
+        <button onClick={onClose}>{nameFix ? "Cancel" : "Close"}</button>
+        {nameFix && (
+          <button className="primary" onClick={onFix}>
+            Fix name
+          </button>
+        )}
+      </div>
+    </dialog>
+  );
+}
