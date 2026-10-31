@@ -62,6 +62,16 @@ describe("widget caption decoding", () => {
       "I mean, ya",
     );
   });
+  it("decodes captions that mix %uXXXX escapes with percent escapes", () => {
+    expect(
+      cleanWidgetCaption(
+        "%u200BYeah...%20speaking%20of%20which%2C%20where%20even%20%5B%5B%5Bis%5D%5D%5D%20%5B%5B%5Bhe%5D%5D%5D%3F",
+      ),
+    ).toBe("Yeah... speaking of which, where even is he?");
+    expect(cleanWidgetCaption("it%u2019s%20fine")).toBe("it\u2019s fine");
+    expect(cleanWidgetCaption("%u200B%20")).toBe("");
+    expect(cleanWidgetCaption("50%ab sure")).toBe("50%ab sure");
+  });
   it("ignores blank end-of-video captions and preserves literal percent signs", () => {
     expect(cleanWidgetCaption("&nbsp;")).toBe("");
     expect(cleanWidgetCaption("100% sure &amp; ready")).toBe(
