@@ -11,6 +11,7 @@ import {
   validSection,
   paddedSection,
   stepPaddedLength,
+  jobProgress,
   endFromPaddedLength,
   codecFamily,
   updateQueue,
@@ -1329,12 +1330,12 @@ function App() {
                 <div className="job-body">
                   <strong>{j.title}</strong>
                   <div className="job-status">
-                    <span>
-                      {j.state === "cooldown" ? "Cooling down" : j.state}
-                    </span>
+                    <span>{jobProgress(j).label}</span>
                     <span>
                       {[
-                        `${j.progress.toFixed(1)}%`,
+                        jobProgress(j).percent === null
+                          ? ""
+                          : `${jobProgress(j).percent!.toFixed(1)}%`,
                         j.speed,
                         j.bytes,
                         j.eta ? `${j.eta} remaining` : "",
@@ -1343,7 +1344,10 @@ function App() {
                         .join(" · ")}
                     </span>
                   </div>
-                  <progress value={j.progress} max="100" />
+                  <progress
+                    value={jobProgress(j).percent ?? undefined}
+                    max="100"
+                  />
                   {j.message && <p>{j.message}</p>}
                 </div>
                 <div className="job-actions">

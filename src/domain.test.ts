@@ -3,6 +3,7 @@ import {
   normalizeUrl,
   paddedSection,
   stepPaddedLength,
+  jobProgress,
   endFromPaddedLength,
   parseTimestamp,
   timestamp,
@@ -189,5 +190,39 @@ describe("editable padded length", () => {
     expect(() => endFromPaddedLength(10, 2, 100, NaN)).toThrow();
     expect(() => endFromPaddedLength(10, 2, 100, 95)).toThrow(/fit/);
     expect(() => endFromPaddedLength(10, 2, 100, 2)).toThrow(/short/);
+  });
+});
+
+describe("queue progress", () => {
+  const job = (state: string, phase: string, progress: number) => ({
+    id: "x",
+    title: "t",
+    state,
+    phase,
+    progress,
+    speed: "",
+    bytes: "",
+    eta: "",
+    message: "",
+    path: "",
+  });
+  it("is indeterminate until a transfer reports real progress", () => {
+    expect(jobProgress(job("downloading", "preparing", 0))).toEqual({
+      label: "Preparing",
+      percent: null,
+    });
+    expect(jobProgress(job("downloading", "transferring", 0))).toEqual({
+      label: "downloading",
+      percent: null,
+    });
+    expect(jobProgress(job("downloading", "transferring", 42.5)).percent).toBe(
+      42.5,
+    );
+    expect(jobProgress(job("downloading", "finishing", 99.9))).toEqual({
+      label: "Finishing",
+      percent: null,
+    });
+    expect(jobProgress(job("completed", "", 100)).percent).toBe(100);
+    expect(jobProgress(job("cooldown", "", 0)).label).toBe("Cooling down");
   });
 });

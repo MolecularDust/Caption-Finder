@@ -25,6 +25,7 @@ export type Job = {
   id: string;
   title: string;
   state: string;
+  phase?: string;
   progress: number;
   speed: string;
   bytes: string;
@@ -240,4 +241,24 @@ export function fileNameNeedsFix(input: string): boolean {
     ) ||
     /[\u2028\u2029]/.test(input)
   );
+}
+
+/** Status text and determinate percentage for a queue row; null percent means "indeterminate". */
+export function jobProgress(job: Job): {
+  label: string;
+  percent: number | null;
+} {
+  const running = ["downloading", "merging", "processing"].includes(job.state);
+  if (job.state === "completed") return { label: "completed", percent: 100 };
+  if (job.state === "cooldown") return { label: "Cooling down", percent: null };
+  if (job.state === "downloading" && job.phase === "preparing")
+    return { label: "Preparing", percent: null };
+  if (job.state === "downloading" && job.phase === "finishing")
+    return { label: "Finishing", percent: null };
+  if (running || job.state === "paused")
+    return {
+      label: job.state,
+      percent: job.progress > 0 ? Math.min(100, job.progress) : null,
+    };
+  return { label: job.state, percent: null };
 }

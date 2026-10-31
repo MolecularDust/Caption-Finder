@@ -33,6 +33,8 @@ pub struct Job {
     pub id: String,
     pub title: String,
     pub state: String,
+    /// Stage within a running download: "preparing", "transferring" or "finishing".
+    pub phase: String,
     pub progress: f64,
     pub speed: String,
     pub bytes: String,
@@ -194,6 +196,7 @@ mod selection_tests {
                     id: state.into(),
                     title: "Test".into(),
                     state: state.into(),
+                    phase: String::new(),
                     progress: 0.,
                     speed: String::new(),
                     bytes: String::new(),

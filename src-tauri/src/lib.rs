@@ -410,6 +410,8 @@ fn download(
             }
             j.pid = child.id();
             j.state = "downloading".into();
+            j.phase = "preparing".into();
+            j.progress = 0.;
             j.message.clear();
             if !j.hidden {
                 let _ = app.emit("job", j.clone());
@@ -443,6 +445,16 @@ fn download(
             trace.note(&line);
             if line.starts_with("PROGRESS|") || line.starts_with("out_time_us=") {
                 trace.mark_once("first_progress");
+            }
+            if line.starts_with("[download] Destination")
+                || line.starts_with("PROGRESS|")
+                || line.starts_with("out_time_us=")
+            {
+                update(&app, &jobs, &id, |j| {
+                    if j.phase != "transferring" {
+                        j.phase = "transferring".into();
+                    }
+                });
             }
             if let Some(micros) = line.strip_prefix("out_time_us=") {
                 if let (Ok(us), Some([a, b])) = (micros.parse::<f64>(), r.section) {
@@ -511,6 +523,7 @@ fn download(
             }
             return Err(safe_error(&errors));
         }
+        update(&app, &jobs, &id, |j| j.phase = "finishing".into());
         let path = jobs.lock().unwrap_or_else(|e| e.into_inner())[&id].path.clone();
         if path.is_empty() || !PathBuf::from(&path).is_file() {
             return Err("Downloader returned no output file".into());
@@ -655,6 +668,7 @@ fn download(
         diagnostics::log_timed(diagnostics::Stage::PostProcess, &s, None, "", &post);
         j.path = final_path.to_string_lossy().into_owned();
         j.state = "completed".into();
+        j.phase.clear();
         j.progress = 100.;
         if let Ok(metadata) = std::fs::metadata(&final_path) {
             j.bytes = format_size(metadata.len());
@@ -844,6 +858,7 @@ async fn enqueue(
             .transpose()?
             .unwrap_or_else(|| request.title.clone()),
         state: "queued".into(),
+        phase: String::new(),
         progress: 0.,
         speed: String::new(),
         bytes: String::new(),
