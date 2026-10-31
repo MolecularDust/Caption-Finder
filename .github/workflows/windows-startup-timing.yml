@@ -1,0 +1,18 @@
+name: Windows tool timing (temporary)
+on: [push]
+permissions:
+  contents: read
+jobs:
+  timing:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/install-tools.mjs
+      - name: Time yt-dlp.exe start-up
+        shell: pwsh
+        run: |
+          foreach ($i in 1..4) { "{0:N2} s" -f (Measure-Command { & .tools/bin/yt-dlp.exe --version | Out-Null }).TotalSeconds }
+          (Get-Item .tools/bin/yt-dlp.exe).Length

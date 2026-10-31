@@ -40,7 +40,7 @@ pub fn retrieve(
     language: String,
     settings: Settings,
     cache: PathBuf,
-) -> Result<Value, String> {
+) -> Result<(Value, Vec<u8>), String> {
     let normalized = crate::model::normalize(&url)?;
     if language.len() > 3 || language.len() < 2 || !language.bytes().all(|c| c.is_ascii_lowercase())
     {
@@ -65,7 +65,8 @@ pub fn retrieve(
             safe_error(&String::from_utf8_lossy(&o.stderr))
         ));
     }
-    let v: Value = serde_json::from_slice(&o.stdout).map_err(|_| "Invalid caption metadata")?;
+    let raw = o.stdout;
+    let v: Value = serde_json::from_slice(&raw).map_err(|_| "Invalid caption metadata")?;
     if v["is_live"].as_bool() == Some(true)
         || !v["duration"]
             .as_f64()
@@ -152,9 +153,10 @@ pub fn retrieve(
             }
         })
         .collect::<Vec<_>>();
-    Ok(
+    Ok((
         json!({"video": {"id":v["id"],"url":normalized,"title":v["title"],"channel":v["channel"],"duration":v["duration"],"thumbnail":v["thumbnail"],"formats":v["formats"].as_array().map(|a| a.iter().map(|f| json!({"format_id":f["format_id"],"height":f["height"],"vcodec":f["vcodec"],"acodec":f["acodec"],"ext":f["ext"]})).collect::<Vec<_>>()),"subtitles":v["subtitles"]},"track":{"language":code,"kind":if automatic {"original automatic"} else {"supplied"},"cues":cues}}),
-    )
+        raw,
+    ))
 }
 #[cfg(test)]
 mod tests {
@@ -179,7 +181,7 @@ mod network_tests {
             std::env::temp_dir().join(format!("youglish-caption-smoke-{}", uuid::Uuid::new_v4()));
         let diagnostics = std::env::temp_dir().join(format!("yg-diag-{}", uuid::Uuid::new_v4()));
         crate::diagnostics::initialize(diagnostics.clone());
-        let result = retrieve(
+        let (result, _) = retrieve(
             "https://www.youtube.com/watch?v=H14bBuluwB8".into(),
             "en".into(),
             Settings::default(),

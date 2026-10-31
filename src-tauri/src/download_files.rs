@@ -165,6 +165,23 @@ mod tests {
         std::fs::remove_dir_all(dest).unwrap();
     }
     #[test]
+    fn publishes_into_a_destination_longer_than_260_characters() {
+        let mut dest = destination();
+        for n in 0..6 {
+            dest.push(format!("{n}-{}", "d".repeat(44)));
+        }
+        std::fs::create_dir_all(&dest).unwrap();
+        assert!(dest.to_string_lossy().len() > 260);
+        let files = DownloadFiles::new(&dest).unwrap();
+        let source = files.directory.join("clip.mp4");
+        std::fs::write(&source, b"x").unwrap();
+        let published = files.publish(&source, Some("A clip.mp4"), false).unwrap();
+        assert_eq!(std::fs::read(&published).unwrap(), b"x");
+        drop(files);
+        let root = dest.ancestors().nth(6).unwrap().to_path_buf();
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn sweep_removes_only_dead_instances_staging_folders() {
         let dest = destination();
         let mine = DownloadFiles::new(&dest).unwrap();

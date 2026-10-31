@@ -31,7 +31,8 @@ pub fn dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 fn file_pid(name: &str) -> Option<u32> {
-    name.strip_prefix("youglish-session-")?
+    name.strip_prefix("youglish-session-")
+        .or_else(|| name.strip_prefix("youglish-info-"))?
         .split('-')
         .next()?
         .parse()
@@ -138,8 +139,16 @@ pub fn preflight(app: &tauri::AppHandle, settings: &crate::model::Settings) -> R
     Ok(())
 }
 fn create_file(dir: &std::path::Path, text: &str) -> Result<PathBuf, String> {
+    create_named(dir, "youglish-session", "txt", text.as_bytes())
+}
+fn create_named(
+    dir: &std::path::Path,
+    prefix: &str,
+    extension: &str,
+    bytes: &[u8],
+) -> Result<PathBuf, String> {
     let path = dir.join(format!(
-        "youglish-session-{}-{}.txt",
+        "{prefix}-{}-{}.{extension}",
         std::process::id(),
         uuid::Uuid::new_v4()
     ));
@@ -153,12 +162,18 @@ fn create_file(dir: &std::path::Path, text: &str) -> Result<PathBuf, String> {
     let mut file = options
         .open(&path)
         .map_err(|_| "Cannot create private session file")?;
-    if file.write_all(text.as_bytes()).is_err() {
+    if file.write_all(bytes).is_err() {
         drop(file);
         let _ = std::fs::remove_file(&path);
         return Err("Cannot prepare YouTube session".into());
     }
     Ok(path)
+}
+/// Write yt-dlp metadata (it contains signed media links) to a private file that is removed when
+/// the returned guard is dropped. It is never written to the download folder.
+pub fn write_metadata(app: &tauri::AppHandle, json: &[u8]) -> Result<Arc<CookieFile>, String> {
+    let path = create_named(&dir(app)?, "youglish-info", "json", json)?;
+    Ok(Arc::new(CookieFile(path)))
 }
 /// Take a fresh cookie snapshot. Call immediately before a yt-dlp run, not when queueing;
 /// the file lives only as long as the returned settings.

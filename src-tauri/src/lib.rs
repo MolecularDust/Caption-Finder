@@ -5,6 +5,7 @@ mod model;
 mod network;
 mod platform;
 mod player;
+mod metadata;
 mod session;
 mod timing;
 use model::*;
@@ -22,6 +23,7 @@ struct Backend {
     origin: String,
     sender: std::sync::mpsc::Sender<(String, Settings)>,
     analyzer: Arc<Mutex<Option<u32>>>,
+    metadata: Arc<metadata::MetadataCache>,
 }
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let p = if platform::portable() {
@@ -59,7 +61,6 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
         "--ignore-config",
         "--no-playlist",
         "--no-warnings",
-        "--no-cache-dir",
         "--socket-timeout",
         "20",
         "--retries",
@@ -77,6 +78,10 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
     if let Ok(p) = platform::binary("deno") {
         c.arg("--js-runtimes").arg(format!("deno:{}", p.display()));
     }
+    match platform::cache_dir() {
+        Some(dir) => c.arg("--cache-dir").arg(dir),
+        None => c.arg("--no-cache-dir"),
+    };
     network::configure(&mut c);
     auth(&mut c, s)?;
     diagnostics::log(diagnostics::Stage::Invocation, s, None, "");
@@ -184,9 +189,15 @@ async fn caption_track(
     }
     .join("captions");
 
-    tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, settings, cache))
-        .await
-        .map_err(|_| "Caption worker stopped".to_string())?
+    let (value, raw) =
+        tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, settings, cache))
+            .await
+            .map_err(|_| "Caption worker stopped".to_string())??;
+    // Keep the full metadata so the download of this video can skip extracting it again.
+    if let Some(id) = value["video"]["id"].as_str() {
+        s.metadata.put(id, raw);
+    }
+    Ok(value)
 }
 #[tauri::command]
 fn player_origin(s: State<Backend>) -> String {
@@ -264,22 +275,41 @@ fn run_job(
         Err(e) => return fail(e),
     };
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        download(app.clone(), jobs.clone(), id.to_string(), settings)
+        let video = jobs.lock().unwrap_or_else(|e| e.into_inner())[id].request.url.clone();
+        let video = normalize(&video).ok().and_then(|u| u.rsplit('=').next().map(str::to_string));
+        let cache = app.state::<Backend>().metadata.clone();
+        let cached = video.as_deref().and_then(|v| cache.get(v));
+        let retry = match cached {
+            Some(saved) => download(app.clone(), jobs.clone(), id.to_string(), settings.clone(), Some(saved)),
+            None => true,
+        };
+        if retry {
+            // No saved metadata, or it no longer worked (for example its links expired).
+            if let Some(v) = video.as_deref() {
+                cache.forget(v);
+            }
+            download(app.clone(), jobs.clone(), id.to_string(), settings, None);
+        }
     }));
     if outcome.is_err() {
         fail("The download worker hit an internal error. Retry the download.".into());
     }
 }
+/// Returns true when it used saved metadata and the download failed in a way a fresh extraction
+/// might fix; the caller then runs it again without the saved metadata.
 fn download(
     app: tauri::AppHandle,
     jobs: Arc<Mutex<HashMap<String, Job>>>,
     id: String,
     s: Settings,
-) {
+    saved: Option<Arc<Vec<u8>>>,
+) -> bool {
     let r = jobs.lock().unwrap_or_else(|e| e.into_inner())[&id].request.clone();
     let mut files = None;
+    let mut retry_fresh = false;
     let result = (|| -> Result<(), String> {
         let mut c = base(&s)?;
+        let info_file = saved.as_ref().and_then(|json| session::write_metadata(&app, json).ok());
         let destination = PathBuf::from(&r.destination)
             .canonicalize()
             .map_err(|_| "Destination is unavailable")?;
@@ -364,10 +394,11 @@ fn download(
         if cfg!(debug_assertions) {
             c.arg("--verbose"); // development builds only: lets timing see yt-dlp's phases
         }
-        c.arg("--")
-            .arg(normalize(&r.url)?)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        match &info_file {
+            Some(file) => c.arg("--load-info-json").arg(&file.0),
+            None => c.arg("--").arg(normalize(&r.url)?),
+        };
+        c.stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child = platform::spawn(&mut c).map_err(|_| "Unable to start downloader")?;
         {
             let mut map = jobs.lock().unwrap_or_else(|e| e.into_inner());
@@ -474,6 +505,10 @@ fn download(
             return Ok(());
         }
         if !status.success() {
+            if info_file.is_some() && !diagnostics::http_statuses(&errors).contains(&429) {
+                retry_fresh = true;
+                return Ok(());
+            }
             return Err(safe_error(&errors));
         }
         let path = jobs.lock().unwrap_or_else(|e| e.into_inner())[&id].path.clone();
@@ -661,6 +696,7 @@ fn download(
             j.pid = 0;
         });
     }
+    retry_fresh
 }
 // Some HTTP delivery formats retain a positive PTS origin when stream-copied.
 // Normalize that origin locally without downloading or encoding any additional media.
@@ -1084,6 +1120,14 @@ pub fn run() {
             if let Ok(dir) = session::dir(app.handle()) {
                 session::sweep_stale(&dir);
             }
+            let cache = if platform::portable() {
+                platform::data_dir().map(|p| p.join("Cache"))
+            } else {
+                app.path().app_cache_dir().map_err(|e| e.to_string())
+            };
+            if let Ok(cache) = cache {
+                platform::set_cache_dir(cache.join("yt-dlp"));
+            }
             if !settings.destination.is_empty() {
                 download_files::sweep_stale(std::path::Path::new(&settings.destination));
             }
@@ -1124,6 +1168,7 @@ pub fn run() {
                 jobs,
                 sender,
                 analyzer: Arc::new(Mutex::new(None)),
+                metadata: Arc::new(metadata::MetadataCache::default()),
                 origin: player::start().map_err(std::io::Error::other)?,
             });
             Ok(())

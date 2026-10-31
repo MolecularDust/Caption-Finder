@@ -79,6 +79,8 @@ pub fn ffmpeg_exit(text: &str) -> Option<i64> {
 struct Record {
     schema: u8,
     build: &'static str,
+    deno_jit: bool,
+    yt_dlp_cache: bool,
     duration_ms: Option<u64>,
     phases: Vec<crate::timing::Phase>,
     unix_seconds: u64,
@@ -106,6 +108,8 @@ fn record(stage: Stage, s: &Settings, code: Option<i32>, stderr: &str) -> Record
     Record {
         schema: 2,
         build: env!("YG_BUILD"),
+        deno_jit: crate::platform::deno_jit(),
+        yt_dlp_cache: crate::platform::cache_dir().is_some(),
         duration_ms: None,
         phases: Vec::new(),
         unix_seconds: std::time::SystemTime::now()
