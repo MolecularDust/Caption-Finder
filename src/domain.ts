@@ -171,6 +171,24 @@ export function paddedSection(
   return [Math.max(0, start - extra), Math.min(duration, end + extra)];
 }
 
+/** Base Out that makes the padded clip exactly `length` seconds long. */
+export function endFromPaddedLength(
+  start: number,
+  padding: number,
+  duration: number,
+  length: number,
+): number {
+  const extra = Math.max(0, Math.min(99, Math.trunc(padding)));
+  const clipEnd =
+    Math.round((Math.max(0, start - extra) + length) * 1000) / 1000;
+  if (!Number.isFinite(length) || length <= 0)
+    throw Error("Length must be a positive number of seconds.");
+  if (clipEnd > duration) throw Error("Length does not fit within the video.");
+  const end = Math.round((clipEnd - extra) * 1000) / 1000;
+  if (end <= start) throw Error("Length is too short for the current padding.");
+  return end;
+}
+
 export function stepPaddedLength(
   start: number,
   end: number,
@@ -199,7 +217,11 @@ export function safeFileName(input: string): string {
   // A final period is valid: the extension is appended after it.
   name = name.trim();
   if (/^\.*$/.test(name)) name = "";
-  if (/^(con|prn|aux|nul|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(\.|$)/i.test(name))
+  if (
+    /^(con|prn|aux|nul|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(\.|$)/i.test(
+      name,
+    )
+  )
     name = `_${name}`;
   let result = "";
   for (const c of name) {

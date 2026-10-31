@@ -3,6 +3,7 @@ import {
   normalizeUrl,
   paddedSection,
   stepPaddedLength,
+  endFromPaddedLength,
   parseTimestamp,
   timestamp,
   preciseTimestamp,
@@ -174,5 +175,19 @@ describe("length stepper with padding", () => {
     expect(stepPaddedLength(10, 100, 2, 100, -1)).toBe(97);
     expect(stepPaddedLength(10, 98, 2, 100, 1)).toBe(98);
     expect(stepPaddedLength(10, 10.1, 2, 100, -1)).toBe(10.01);
+  });
+});
+
+describe("editable padded length", () => {
+  it("maps a typed padded length back to the base Out", () => {
+    expect(endFromPaddedLength(10, 2, 100, 7.32)).toBeCloseTo(13.32, 3);
+    expect(endFromPaddedLength(0, 2, 100, 5)).toBe(3);
+    expect(endFromPaddedLength(10, 0, 100, 4)).toBe(14);
+  });
+  it("rejects invalid lengths", () => {
+    expect(() => endFromPaddedLength(10, 2, 100, 0)).toThrow();
+    expect(() => endFromPaddedLength(10, 2, 100, NaN)).toThrow();
+    expect(() => endFromPaddedLength(10, 2, 100, 95)).toThrow(/fit/);
+    expect(() => endFromPaddedLength(10, 2, 100, 2)).toThrow(/short/);
   });
 });
