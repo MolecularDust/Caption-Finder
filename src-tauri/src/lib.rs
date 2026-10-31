@@ -6,6 +6,7 @@ mod network;
 mod platform;
 mod player;
 mod session;
+mod timing;
 use model::*;
 use std::{
     collections::HashMap,
@@ -360,6 +361,9 @@ fn download(
                 c.args(["--downloader-args", "ffmpeg_o:-progress pipe:1 -nostats"]);
             }
         }
+        if cfg!(debug_assertions) {
+            c.arg("--verbose"); // development builds only: lets timing see yt-dlp's phases
+        }
         c.arg("--")
             .arg(normalize(&r.url)?)
             .stdout(Stdio::piped())
@@ -381,9 +385,12 @@ fn download(
             }
         }
         let stderr = child.stderr.take().unwrap();
+        let trace = timing::Trace::new();
+        let err_trace = trace.clone();
         let errors = std::thread::spawn(move || {
             let mut tail = String::new();
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                err_trace.note(&line);
                 tail.push_str(&line);
                 tail.push('\n');
                 if tail.len() > 16384 {
@@ -402,6 +409,10 @@ fn download(
             .lines()
             .map_while(Result::ok)
         {
+            trace.note(&line);
+            if line.starts_with("PROGRESS|") || line.starts_with("out_time_us=") {
+                trace.mark_once("first_progress");
+            }
             if let Some(micros) = line.strip_prefix("out_time_us=") {
                 if let (Ok(us), Some([a, b])) = (micros.parse::<f64>(), r.section) {
                     update(&app, &jobs, &id, |j| {
@@ -456,7 +467,8 @@ fn download(
             .wait()
             .map_err(|_| "Downloader did not exit cleanly")?;
         let errors = errors.join().unwrap_or_default();
-        diagnostics::log(diagnostics::Stage::Download, &s, status.code(), &errors);
+        diagnostics::log_timed(diagnostics::Stage::Download, &s, status.code(), &errors, &trace);
+        let post = timing::Trace::new();
         update(&app, &jobs, &id, |j| j.pid = 0);
         if jobs.lock().unwrap_or_else(|e| e.into_inner())[&id].state == "canceled" {
             return Ok(());
@@ -470,6 +482,7 @@ fn download(
         }
         if r.section.is_some() && !r.precise {
             normalize_fast(&app, &jobs, &id, &path, &r)?;
+            post.mark("normalize");
             if jobs.lock().unwrap_or_else(|e| e.into_inner())[&id].state == "canceled" {
                 return Ok(());
             }
@@ -487,6 +500,7 @@ fn download(
         if !probe.status.success() {
             return Err("Output failed FFprobe inspection".into());
         }
+        post.mark("probe");
         let data: serde_json::Value =
             serde_json::from_slice(&probe.stdout).map_err(|_| "Invalid inspection result")?;
         let streams = data["streams"].as_array().ok_or("Output has no streams")?;
@@ -602,6 +616,8 @@ fn download(
             custom_name.as_deref(),
             overwrite,
         )?;
+        post.mark("publish");
+        diagnostics::log_timed(diagnostics::Stage::PostProcess, &s, None, "", &post);
         j.path = final_path.to_string_lossy().into_owned();
         j.state = "completed".into();
         j.progress = 100.;

@@ -1,6 +1,6 @@
 use crate::{base, model::Settings, safe_error};
 use serde_json::{json, Value};
-use std::{path::PathBuf, process::Stdio};
+use std::path::PathBuf;
 struct TempDir(PathBuf);
 impl Drop for TempDir {
     fn drop(&mut self) {
@@ -47,17 +47,17 @@ pub fn retrieve(
         return Err("Unsupported caption language code".into());
     }
     let mut c = base(&settings)?;
-    let o = crate::platform::output(
-        c.args(["--dump-single-json", "--skip-download", "--", &normalized])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped()),
-    )
-    .map_err(|_| "Cannot start caption worker")?;
-    crate::diagnostics::log(
+    if cfg!(debug_assertions) {
+        c.arg("--verbose"); // development builds only: makes yt-dlp print its phases for timing
+    }
+    let (o, trace) = crate::timing::run(c.args(["--dump-single-json", "--skip-download", "--", &normalized]))
+        .map_err(|_| "Cannot start caption worker")?;
+    crate::diagnostics::log_timed(
         crate::diagnostics::Stage::CaptionMetadata,
         &settings,
         o.status.code(),
         &String::from_utf8_lossy(&o.stderr),
+        &trace,
     );
     if !o.status.success() {
         return Err(format!(
@@ -106,13 +106,17 @@ pub fn retrieve(
     } else {
         "--write-subs"
     });
-    let o = crate::platform::output(c.arg("-o").arg(template).arg("--load-info-json").arg(&info))
+    if cfg!(debug_assertions) {
+        c.arg("--verbose");
+    }
+    let (o, trace) = crate::timing::run(c.arg("-o").arg(template).arg("--load-info-json").arg(&info))
         .map_err(|_| "Cannot retrieve captions")?;
-    crate::diagnostics::log(
+    crate::diagnostics::log_timed(
         crate::diagnostics::Stage::Captions,
         &settings,
         o.status.code(),
         &String::from_utf8_lossy(&o.stderr),
+        &trace,
     );
     if !o.status.success() {
         return Err(format!(
@@ -173,6 +177,8 @@ mod network_tests {
     fn windows_public_caption_workflow() {
         let cache =
             std::env::temp_dir().join(format!("youglish-caption-smoke-{}", uuid::Uuid::new_v4()));
+        let diagnostics = std::env::temp_dir().join(format!("yg-diag-{}", uuid::Uuid::new_v4()));
+        crate::diagnostics::initialize(diagnostics.clone());
         let result = retrieve(
             "https://www.youtube.com/watch?v=H14bBuluwB8".into(),
             "en".into(),
@@ -183,5 +189,9 @@ mod network_tests {
         assert!(!result["track"]["cues"].as_array().unwrap().is_empty());
         assert_eq!(std::fs::read_dir(&cache).unwrap().count(), 0);
         std::fs::remove_dir(cache).unwrap();
+        let log = std::fs::read_to_string(diagnostics.join("media.jsonl")).unwrap();
+        println!("{log}");
+        assert!(log.contains("\"duration_ms\""));
+        std::fs::remove_dir_all(diagnostics).unwrap();
     }
 }
