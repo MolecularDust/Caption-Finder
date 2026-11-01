@@ -10,14 +10,14 @@ const lister = (data: Record<string, { id: string }[]>, calls: string[] = []) =>
   };
 
 describe("mergedLister", () => {
-  it("alternates between channels", async () => {
+  it("reads one channel after another, in the order given", async () => {
     const next = mergedLister(lister({ a: ids("a", 3), b: ids("b", 3) }), ["a", "b"], 10);
-    expect((await next(1, 4)).map((e) => e.id)).toEqual(["a0", "b0", "a1", "b1"]);
-    expect((await next(5, 10)).map((e) => e.id)).toEqual(["a2", "b2"]);
+    expect((await next(1, 4)).map((e) => e.id)).toEqual(["a0", "a1", "a2", "b0"]);
+    expect((await next(5, 10)).map((e) => e.id)).toEqual(["b1", "b2"]);
   });
   it("tags every video with the channel it came from", async () => {
     const next = mergedLister(lister({ a: ids("a", 2), b: ids("b", 2) }), ["a", "b"], 10);
-    expect((await next(1, 4)).map((e) => e.source)).toEqual(["a", "b", "a", "b"]);
+    expect((await next(1, 4)).map((e) => e.source)).toEqual(["a", "a", "b", "b"]);
   });
   it("keeps going with the remaining channel when one runs out", async () => {
     const next = mergedLister(lister({ a: ids("a", 1), b: ids("b", 4) }), ["a", "b"], 10);
@@ -28,7 +28,7 @@ describe("mergedLister", () => {
     const next = mergedLister(lister({ a: ids("a", 99), b: ids("b", 99) }, calls), ["a", "b"], 5, 3);
     const all = await next(1, 100);
     expect(all).toHaveLength(10);
-    expect(calls).toEqual(["a:1+3", "b:1+3", "a:4+2", "b:4+2"]);
+    expect(calls).toEqual(["a:1+3", "a:4+2", "b:1+3", "b:4+2"]);
   });
   it("skips a channel that fails, but throws when all fail", async () => {
     const some = mergedLister(
@@ -42,6 +42,18 @@ describe("mergedLister", () => {
     expect((await some(1, 10)).map((e) => e.id)).toEqual(["a0", "a1"]);
     const all = mergedLister(async () => { throw new Error("nope"); }, ["x", "y"], 5);
     await expect(all(1, 10)).rejects.toThrow("nope");
+  });
+});
+
+describe("mixed channels", () => {
+  it("takes one video from each channel in turn", async () => {
+    const next = mergedLister(lister({ a: ids("a", 3), b: ids("b", 3) }), ["a", "b"], 10, 30, true);
+    expect((await next(1, 4)).map((e) => e.id)).toEqual(["a0", "b0", "a1", "b1"]);
+    expect((await next(5, 10)).map((e) => e.id)).toEqual(["a2", "b2"]);
+  });
+  it("carries on with the longer channel when the other runs out", async () => {
+    const next = mergedLister(lister({ a: ids("a", 1), b: ids("b", 3) }), ["a", "b"], 10, 30, true);
+    expect((await next(1, 10)).map((e) => e.id)).toEqual(["a0", "b0", "b1", "b2"]);
   });
 });
 

@@ -8,6 +8,8 @@ export type ChannelChoice = {
   thumbnail?: string;
 };
 
+export type ChannelPreset = { name: string; channels: ChannelChoice[] };
+
 export type ChannelSuggestion = {
   id: string;
   title: string;
@@ -28,15 +30,17 @@ export const subscriberText = (n?: number) => {
 };
 
 /**
- * One stream of videos from several channels, taking turns so every channel is represented
- * near the top. Each channel contributes at most `perChannel` of its newest videos. Pages are
- * fetched lazily; callers must read the stream in order (as searchChannel does).
+ * One stream of videos from several channels. By default it reads one channel after another
+ * in the order given; with `mix` it takes one video from each channel in turn, then the next
+ * from each, and so on. Each channel contributes at most `perChannel` of its newest videos.
+ * Pages are fetched lazily; callers must read the stream in order (as searchChannel does).
  */
 export function mergedLister(
   list: (source: string, from: number, count: number) => Promise<ChannelEntry[]>,
   sources: string[],
   perChannel: number,
   pageSize = 30,
+  mix = false,
 ) {
   const queues = sources.map(() => [] as ChannelEntry[]);
   const fetched = sources.map(() => 0);
@@ -64,10 +68,9 @@ export function mergedLister(
   return async (_from: number, count: number): Promise<ChannelEntry[]> => {
     const out: ChannelEntry[] = [];
     while (out.length < count) {
-      const live = queues.map((_, i) => i).filter((i) => queues[i].length || !done[i]);
+      const live = queues.map((_, k) => k).filter((k) => queues[k].length || !done[k]);
       if (!live.length) break;
-      const i = live[turn % live.length];
-      turn++;
+      const i = mix ? live[turn++ % live.length] : live[0];
       if (!queues[i].length) await refill(i);
       const next = queues[i].shift();
       if (next) out.push(next);

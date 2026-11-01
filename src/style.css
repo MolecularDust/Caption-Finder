@@ -767,6 +767,18 @@ footer > span:first-child {
   padding: 25px;
   border-radius: 15px;
   box-shadow: 0 20px 100px #0003;
+  /* Taller than the window: scroll inside the dialog, keeping its title and Done button in view. */
+  max-height: calc(100vh - 50px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.modal > .section-heading {
+  position: sticky;
+  top: -25px;
+  z-index: 1;
+  margin: -25px -25px 0;
+  padding: 25px 25px 12px;
+  background: var(--panel);
 }
 .modal .field {
   margin-top: 20px;
@@ -1554,7 +1566,6 @@ button.attention {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
-  max-width: calc(50% - 8px);
 }
 .chip {
   display: inline-flex;
@@ -1616,4 +1627,46 @@ button.attention {
 @media (prefers-reduced-motion: reduce) {
   .suggestions .looking .spinner { animation-duration: 2s; }
   .dots::after { animation: none; content: "…"; }
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.preset-label {
+  font-size: 11px;
+  font-weight: 650;
+  opacity: 0.65;
+}
+.chip.preset {
+  padding-left: 4px;
+}
+.chip.preset .preset-load {
+  font-size: 12px;
+  padding: 0 4px 0 6px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip.preset .preset-load small {
+  opacity: 0.6;
+}
+.preset-save,
+.preset-form button {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.preset-form {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.preset-form input {
+  height: 28px;
+  width: 180px;
+  font-size: 12px;
 }

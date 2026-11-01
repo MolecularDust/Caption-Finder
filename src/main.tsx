@@ -43,6 +43,7 @@ import {
   mergedLister,
   subscriberText,
   type ChannelChoice,
+  type ChannelPreset,
   type ChannelSuggestion,
 } from "./channels";
 import { LANGUAGE_CHOICES, captionLanguages } from "./languages";
@@ -97,6 +98,17 @@ function App() {
         return [];
       }
     }),
+    [presets, setPresets] = useState<ChannelPreset[]>(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem("cf.presets") ?? "[]");
+        return Array.isArray(saved)
+          ? saved.filter((p) => p && typeof p.name === "string" && Array.isArray(p.channels))
+          : [];
+      } catch {
+        return [];
+      }
+    }),
+    [presetName, setPresetName] = useState<string | null>(null),
     [suggestions, setSuggestions] = useState<ChannelSuggestion[]>([]),
     [suggesting, setSuggesting] = useState(false),
     [suggestOpen, setSuggestOpen] = useState(false),
@@ -107,6 +119,13 @@ function App() {
         return saved === "manual" || saved === "automatic" ? saved : "any";
       } catch {
         return "any";
+      }
+    }),
+    [mixChannels, setMixChannels] = useState<boolean>(() => {
+      try {
+        return localStorage.getItem("cf.mixChannels") === "1";
+      } catch {
+        return false;
       }
     }),
     [captionLanguage, setCaptionLanguage] = useState<string>(() => {
@@ -551,12 +570,13 @@ function App() {
     setChannelNote("");
   };
   // Removing a channel also drops what it contributed to the results.
-  const removeChannel = (c: ChannelChoice) => {
-    saveChannels(channels.filter((x) => x !== c));
-    removedSources.current.add(c.source);
-    setResults((old) => old.filter((r) => r.source !== c.source));
+  const removeChannels = (gone: ChannelChoice[]) => {
+    const sources = new Set(gone.map((c) => c.source));
+    saveChannels(channels.filter((x) => !sources.has(x.source)));
+    sources.forEach((s) => removedSources.current.add(s));
+    setResults((old) => old.filter((r) => !sources.has(r.source ?? "")));
     const shown = results.find((r) => r.video.id === candidateRef.current);
-    if (shown?.source === c.source) {
+    if (shown && sources.has(shown.source ?? "")) {
       matchRequest.current++;
       candidateRef.current = "";
       setSelectedId("");
@@ -567,6 +587,33 @@ function App() {
       setFileName("");
       setLocal(null);
     }
+  };
+  const removeChannel = (c: ChannelChoice) => removeChannels([c]);
+  const savePresets = (next: ChannelPreset[]) => {
+    setPresets(next);
+    try {
+      localStorage.setItem("cf.presets", JSON.stringify(next));
+    } catch {
+      /* remembering presets is only a convenience */
+    }
+  };
+  const savePreset = () => {
+    const name = (presetName ?? "").trim();
+    if (!name || !channels.length) return;
+    savePresets([
+      ...presets.filter((p) => p.name.toLowerCase() !== name.toLowerCase()),
+      { name, channels },
+    ]);
+    setPresetName(null);
+  };
+  // Loading a preset replaces the current channels, and drops results from the ones it replaces.
+  const loadPreset = (p: ChannelPreset) => {
+    const keep = new Set(p.channels.map((c) => c.source));
+    removeChannels(channels.filter((c) => !keep.has(c.source)));
+    saveChannels(p.channels);
+    removedSources.current = new Set(
+      [...removedSources.current].filter((s) => !keep.has(s)),
+    );
   };
   const addSuggestion = (c: ChannelSuggestion) =>
     addChannel({
@@ -681,6 +728,8 @@ function App() {
               }),
             sources,
             scanCount,
+            30,
+            mixChannels,
           ),
           captions: async (id) => {
             const key = [id, language, source, settings.browser, settings.cookiesFile].join("|");
@@ -981,6 +1030,66 @@ function App() {
               )}
             </div>
           </form>
+          {(channels.length > 0 || presets.length > 0) && (
+            <div className="preset-row" aria-label="Channel presets">
+              {presets.length > 0 && <span className="preset-label">Presets</span>}
+              {presets.map((p) => (
+                <span className="chip preset" key={p.name}>
+                  <button
+                    type="button"
+                    className="preset-load"
+                    title={p.channels.map((c) => c.title).join(", ")}
+                    onClick={() => loadPreset(p)}
+                  >
+                    {p.name}
+                    <small>{p.channels.length}</small>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete preset ${p.name}`}
+                    onClick={() => savePresets(presets.filter((x) => x !== p))}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {channels.length > 0 &&
+                (presetName === null ? (
+                  <button
+                    type="button"
+                    className="preset-save"
+                    onClick={() => setPresetName("")}
+                  >
+                    ＋ Save channels as preset
+                  </button>
+                ) : (
+                  <span className="preset-form">
+                    <input
+                      autoFocus
+                      value={presetName}
+                      placeholder="Preset name"
+                      onChange={(e) => setPresetName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          savePreset();
+                        } else if (e.key === "Escape") setPresetName(null);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!presetName.trim()}
+                      onClick={savePreset}
+                    >
+                      Save
+                    </button>
+                    <button type="button" onClick={() => setPresetName(null)}>
+                      Cancel
+                    </button>
+                  </span>
+                ))}
+            </div>
+          )}
           {channels.length > 0 && (
             <div className="channel-chips" aria-label="Channels to search">
               {channels.map((c) => (
@@ -2089,6 +2198,27 @@ function App() {
               />
               <span>Don’t play the first found video automatically</span>
             </label>
+            <Field label="Results from several channels">
+              <select
+                value={mixChannels ? "mix" : "sequential"}
+                onChange={(e) => {
+                  const mix = e.target.value === "mix";
+                  setMixChannels(mix);
+                  try {
+                    localStorage.setItem("cf.mixChannels", mix ? "1" : "0");
+                  } catch {
+                    /* remembering the choice is only a convenience */
+                  }
+                }}
+              >
+                <option value="sequential">One channel after another</option>
+                <option value="mix">Mix channels (take turns)</option>
+              </select>
+              <small>
+                Mixing takes the newest video from each channel, then the next
+                newest from each, and so on. Applies to the next search.
+              </small>
+            </Field>
             <Field label="Caption language">
               <select
                 value={captionLanguage}
