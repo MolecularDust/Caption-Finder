@@ -643,19 +643,28 @@ function App() {
       try {
         const old = JSON.parse(localStorage.getItem("cf.presets") ?? "[]");
         if (Array.isArray(old)) {
-          const have = new Set(
-            (await invoke<ChannelPreset[]>("list_presets")).map((p) =>
+          const have = new Map(
+            (await invoke<ChannelPreset[]>("list_presets")).map((p) => [
               p.name.toLowerCase(),
-            ),
+              JSON.stringify(p.channels.map((c) => c.source)),
+            ]),
           );
-          for (const p of old)
-            if (
-              p &&
-              typeof p.name === "string" &&
-              Array.isArray(p.channels) &&
-              !have.has(p.name.toLowerCase())
-            )
-              await invoke("save_preset", { name: p.name, channels: p.channels });
+          for (const p of old) {
+            if (!p || typeof p.name !== "string" || !Array.isArray(p.channels))
+              continue;
+            const sources = JSON.stringify(
+              p.channels.map((c: ChannelChoice) => c.source),
+            );
+            const same = have.get(p.name.toLowerCase());
+            if (same === sources) continue;
+            // Never discard a preset: a different one with the same name is kept under
+            // another name.
+            let name = p.name;
+            for (let n = 2; same !== undefined && have.has(name.toLowerCase()); n++)
+              name = `${p.name} (${n})`;
+            await invoke("save_preset", { name, channels: p.channels });
+            have.set(name.toLowerCase(), sources);
+          }
         }
         localStorage.removeItem("cf.presets");
       } catch {
