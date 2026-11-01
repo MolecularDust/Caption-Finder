@@ -131,6 +131,11 @@ fn snapshot(app: &tauri::AppHandle) -> Result<String, String> {
     }
     Ok(text)
 }
+/// Whether the app's own browser session holds signed-in YouTube cookies. Reads them only to
+/// answer yes or no; nothing is written to disk.
+pub fn signed_in(app: &tauri::AppHandle) -> bool {
+    snapshot(app).is_ok()
+}
 /// Check at enqueue time that the app session is signed in. Writes nothing to disk.
 pub fn preflight(app: &tauri::AppHandle, settings: &crate::model::Settings) -> Result<(), String> {
     if settings.browser == "app" {

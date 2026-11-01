@@ -151,6 +151,10 @@ fn safe_error(text: &str) -> String {
     }
 }
 #[tauri::command]
+async fn app_session_status(app: tauri::AppHandle) -> bool {
+    session::signed_in(&app)
+}
+#[tauri::command]
 fn check_browser_access(browser: String) -> String {
     browser_access::check(&browser).as_str().into()
 }
@@ -1227,6 +1231,7 @@ pub fn run() {
             get_settings,
             installed_browsers,
             check_browser_access,
+            app_session_status,
             open_privacy_settings,
             close_grant_helper,
             app_bundle_path,

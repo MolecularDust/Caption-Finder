@@ -91,6 +91,7 @@ function App() {
     } | null>(null),
     [localStatus, setLocalStatus] = useState(""),
     [browserAccess, setBrowserAccess] = useState(""),
+    [appSession, setAppSession] = useState<boolean | null>(null),
     [settled, setSettled] = useState(0),
     [selectedId, setSelectedId] = useState(""),
     [selectedLine, setSelectedLine] = useState(""),
@@ -580,10 +581,24 @@ function App() {
       .then(setBrowserAccess)
       .catch(() => setBrowserAccess(""));
   };
+  // The app's own YouTube session works only once the user has signed in inside the app.
+  const checkAppSession = () => {
+    if (!isTauri() || settings.browser !== "app") {
+      setAppSession(null);
+      return;
+    }
+    invoke<boolean>("app_session_status")
+      .then(setAppSession)
+      .catch(() => setAppSession(null));
+  };
   useEffect(() => {
     if (!showSettings) return;
     checkBrowserAccess(settings.browser);
-    const recheck = () => checkBrowserAccess(settings.browser);
+    checkAppSession();
+    const recheck = () => {
+      checkBrowserAccess(settings.browser);
+      checkAppSession();
+    };
     window.addEventListener("focus", recheck);
     return () => window.removeEventListener("focus", recheck);
   }, [showSettings, settings.browser]);
@@ -1752,6 +1767,31 @@ function App() {
                   </button>
                 </div>
               </div>
+            )}
+            {settings.browser === "app" && appSession === false && (
+              <div
+                className="notice error access-notice"
+                role="alert"
+                style={{ display: "block" }}
+              >
+                <p>
+                  You’re not signed in to YouTube in this app yet. Press “1.
+                  Sign in to Google”, then “2. Connect YouTube” above, and
+                  choose your channel if asked. Until then, searches and
+                  downloads can’t use this option.
+                </p>
+                <div className="playback-test-actions">
+                  <button
+                    onClick={() => act(() => invoke("youtube_sign_in_window"))}
+                  >
+                    1. Sign in to Google ↗
+                  </button>
+                  <button onClick={() => checkAppSession()}>Check again</button>
+                </div>
+              </div>
+            )}
+            {settings.browser === "app" && appSession === true && (
+              <p className="access-ok">✓ Signed in to YouTube in this app.</p>
             )}
             {browserAccess === "ok" && settings.browser && (
               <p className="access-ok">

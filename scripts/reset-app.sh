@@ -29,6 +29,8 @@ for ID in "${IDS[@]}"; do
     "$HOME/Library/Logs/$ID"
     "$HOME/Library/WebKit/$ID"
     "$HOME/Library/HTTPStorages/$ID"
+    "$HOME/Library/HTTPStorages/$ID.binarycookies"   # WebKit's saved Google/YouTube sign-in cookies
+    "$HOME/Library/Cookies/$ID.binarycookies"
     "$HOME/Library/Preferences/$ID.plist"
     "$HOME/Library/Saved Application State/$ID.savedState"
   )
