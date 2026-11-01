@@ -105,6 +105,37 @@ describe("searchChannel", () => {
   });
 });
 
+describe("result ordering", () => {
+  it("reports a result as settled only once every earlier video is done", async () => {
+    const base = deps(["a", "b", "c"], { b: "we will visit" });
+    const events: string[] = [];
+    const slow: SearchDeps = {
+      ...base,
+      captions: async (id) => {
+        if (id === "a") await new Promise((r) => setTimeout(r, 30));
+        return base.captions(id);
+      },
+    };
+    await searchChannel(slow, "we will visit", {
+      limit: 25,
+      batch: 3,
+      cap: 30,
+      concurrency: 3,
+      backoffMs: 1,
+      signal: new AbortController().signal,
+      onResult: (r) => events.push(`result:${r.video.id}`),
+      onProgress: () => {},
+      onSettled: (n) => events.push(`settled:${n}`),
+    });
+    // b arrives while a is still running, so it cannot yet be treated as the top result.
+    const resultAt = events.indexOf("result:b");
+    expect(events.slice(0, resultAt + 1).some((e) => e === "settled:2" || e === "settled:3")).toBe(false);
+    expect(events[events.length - 1]).toBe("settled:3");
+    const numbers = events.filter((e) => e.startsWith("settled:")).map((e) => Number(e.slice(8)));
+    expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
+  });
+});
+
 describe("matchLine", () => {
   it("joins the cues spoken during the match", () => {
     const cues = [

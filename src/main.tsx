@@ -91,6 +91,7 @@ function App() {
     } | null>(null),
     [localStatus, setLocalStatus] = useState(""),
     [browserAccess, setBrowserAccess] = useState(""),
+    [settled, setSettled] = useState(0),
     [selectedId, setSelectedId] = useState(""),
     [selectedLine, setSelectedLine] = useState(""),
     [candidate, setCandidate] = useState(""),
@@ -498,6 +499,7 @@ function App() {
     matchRequest.current++;
     candidateRef.current = "";
     setResults([]);
+    setSettled(0);
     setSelectedId("");
     setCandidate("");
     setVideo(null);
@@ -539,6 +541,7 @@ function App() {
           signal: control.signal,
           onResult: (r) =>
             setResults((old) => [...old, r].sort((a, b) => a.order - b.order)),
+          onSettled: (upTo) => setSettled(upTo),
           onProgress: (scanned, found) =>
             setSearchStatus((old) => ({ ...old, scanned, found })),
         },
@@ -560,9 +563,12 @@ function App() {
     searchAbort.current?.abort();
     setSearchStatus((old) => ({ ...old, state: "done", reason: "cancelled" }));
   };
+  // Open the top result only once no earlier video can still turn up a match; otherwise a
+  // later video that happens to finish first would be selected and then sit below others.
   useEffect(() => {
-    if (!candidate && results.length > 0) selectResult(results[0]);
-  }, [results]);
+    if (!candidate && results.length > 0 && settled >= results[0].order)
+      selectResult(results[0]);
+  }, [results, settled]);
   // macOS can refuse this app access to a browser's cookies; ask, and recheck when the user
   // comes back from System Settings.
   const checkBrowserAccess = (browser: string) => {

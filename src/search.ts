@@ -29,6 +29,8 @@ export type SearchOptions = {
   signal: AbortSignal;
   onResult(result: SearchResult): void;
   onProgress(scanned: number, found: number): void;
+  /** how many leading videos, in channel order, are fully processed: no earlier result can still appear */
+  onSettled?(upTo: number): void;
   /** base pause after YouTube rate-limits a request; grows with each retry */
   backoffMs?: number;
 };
@@ -86,6 +88,8 @@ export async function searchChannel(
       }
     }
   };
+  const finished = new Set<number>();
+  let settled = 0;
   let scanned = 0,
     found = 0,
     deniedRun = 0,
@@ -128,6 +132,9 @@ export async function searchChannel(
             error = message;
         }
         scanned++;
+        finished.add(from - 1 + index);
+        while (finished.has(settled)) settled++;
+        options.onSettled?.(settled);
         options.onProgress(scanned, found);
       }
     };
