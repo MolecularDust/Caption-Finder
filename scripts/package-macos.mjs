@@ -87,6 +87,12 @@ run(
   ["eval", 'console.log("Signed interpreter runtime: OK")'],
   { env: { ...process.env, DENO_V8_FLAGS: "--jitless" } },
 );
+if (process.argv.includes("--app-only")) {
+  // Skip the disk image: it is only needed for a release, and a new build changes the app's
+  // identity for macOS permissions such as Full Disk Access.
+  console.log(`Verified app: ${app}`);
+  process.exit(0);
+}
 mkdirSync(".tools", { recursive: true });
 const temporary = mkdtempSync(resolve(".tools/package-"));
 const staging = join(temporary, "image");

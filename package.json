@@ -13,11 +13,13 @@
     "package": "node scripts/package-macos.mjs",
     "prepare:sidecars": "node scripts/prepare-sidecars.mjs",
     "format": "prettier --write src scripts docs README.md",
+    "package:app": "node scripts/package-macos.mjs --app-only",
     "package:dev": "npm run prepare:sidecars && node scripts/desktop.mjs build --debug --bundles app --config src-tauri/tauri.dev-bundle.conf.json && node scripts/embed-yt-dlp.mjs \"src-tauri/target/debug/bundle/macos/Caption Finder.app\" --reseal",
     "package:portable": "node scripts/package-windows-portable.mjs",
     "package:windows": "npm run prepare:sidecars && node scripts/desktop.mjs build --bundles nsis --config src-tauri/tauri.windows.conf.json"
   },
   "dependencies": {
+    "@crabnebula/tauri-plugin-drag": "^2.1.0",
     "@tauri-apps/api": "^2.8",
     "react": "^19.1",
     "react-dom": "^19.1"

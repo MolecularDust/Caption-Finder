@@ -39,6 +39,7 @@ import {
   type SearchResult,
 } from "./search";
 import { ResultsList, Highlight } from "./results";
+import GrantHelper from "./GrantHelper";
 import "./style.css";
 import appIcon from "./assets/app-icon.png";
 const CAPTION_LANGUAGE = "en";
@@ -83,6 +84,7 @@ function App() {
       scanned: 0,
       found: 0,
     }),
+    [browserAccess, setBrowserAccess] = useState(""),
     [selectedId, setSelectedId] = useState(""),
     [selectedLine, setSelectedLine] = useState(""),
     [candidate, setCandidate] = useState(""),
@@ -503,6 +505,24 @@ function App() {
   useEffect(() => {
     if (!candidate && results.length > 0) selectResult(results[0]);
   }, [results]);
+  // macOS can refuse this app access to a browser's cookies; ask, and recheck when the user
+  // comes back from System Settings.
+  const checkBrowserAccess = (browser: string) => {
+    if (!isTauri() || !browser || browser === "app") {
+      setBrowserAccess("");
+      return;
+    }
+    invoke<string>("check_browser_access", { browser })
+      .then(setBrowserAccess)
+      .catch(() => setBrowserAccess(""));
+  };
+  useEffect(() => {
+    if (!showSettings) return;
+    checkBrowserAccess(settings.browser);
+    const recheck = () => checkBrowserAccess(settings.browser);
+    window.addEventListener("focus", recheck);
+    return () => window.removeEventListener("focus", recheck);
+  }, [showSettings, settings.browser]);
   const formats =
     video?.formats.filter((f) => f.height && f.vcodec !== "none") ?? [];
   const heights = [...new Set(formats.map((f) => f.height!))].sort(
@@ -675,6 +695,15 @@ function App() {
                   role="status"
                 >
                   {searchStatusText(searchStatus)}{" "}
+                  {/Full Disk Access/.test(searchStatus.message ?? "") && (
+                    <button
+                      type="button"
+                      className="inline-action"
+                      onClick={() => act(() => invoke("open_privacy_settings"))}
+                    >
+                      Open privacy settings
+                    </button>
+                  )}{" "}
                   {/denied access|cookies/i.test(searchStatus.message ?? "") && (
                     <button
                       type="button"
@@ -1578,6 +1607,37 @@ function App() {
                 <option value="file">Import Netscape cookies…</option>
               </select>
             </Field>
+            {browserAccess === "blocked" && (
+              <div
+                className="notice error access-notice"
+                role="alert"
+                style={{ display: "block" }}
+              >
+                <p>
+                  macOS is blocking Caption Finder from reading this browser’s
+                  cookies. Press the button: System Settings opens with a small
+                  Caption Finder window beside it. Drag its icon into the Full
+                  Disk Access list, switch it on, and reopen the app. No
+                  permission is needed if you choose Opera or Vivaldi instead,
+                  or sign in with the app’s own YouTube session above.
+                </p>
+                <div className="playback-test-actions">
+                  <button
+                    onClick={() => act(() => invoke("open_privacy_settings"))}
+                  >
+                    Allow access in System Settings ↗
+                  </button>
+                  <button onClick={() => checkBrowserAccess(settings.browser)}>
+                    Check again
+                  </button>
+                </div>
+              </div>
+            )}
+            {browserAccess === "ok" && settings.browser && (
+              <p className="access-ok">
+                ✓ Caption Finder can read this browser’s cookies.
+              </p>
+            )}
             <p className="notice">
               Selecting the app’s session uses only its YouTube cookies in a temporary file, removed when the operation finishes. Selecting another browser authorizes yt-dlp to read its cookies when you
               analyze or download. Your operating system may request browser cookie-store
@@ -1756,10 +1816,10 @@ function TimeInput({
     </div>
   );
 }
+const helperWindow =
+  new URLSearchParams(window.location.search).get("helper") === "grant";
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <React.StrictMode>{helperWindow ? <GrantHelper /> : <App />}</React.StrictMode>,
 );
 
 function ErrorPopup({

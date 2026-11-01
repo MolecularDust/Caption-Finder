@@ -1381,3 +1381,50 @@ mark {
 .app-icon {
   background: transparent;
 }
+
+.access-notice p {
+  color: inherit;
+  margin: 0 0 10px;
+}
+.access-ok {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #2f8a5f;
+}
+.notice.access-notice {
+  display: block;
+}
+.access-notice .playback-test-actions button {
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* Full Disk Access helper window */
+.helper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px;
+  text-align: center;
+  user-select: none;
+}
+.helper strong {
+  font-size: 13px;
+}
+.helper p {
+  margin: 0;
+  font-size: 11px;
+}
+.helper-icon {
+  width: 72px;
+  height: 72px;
+  cursor: grab;
+}
+.helper-error {
+  color: #c24141;
+}
+html:has(.helper),
+body:has(.helper) {
+  overflow: hidden;
+}

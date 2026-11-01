@@ -1,7 +1,9 @@
+mod browser_access;
 mod captions;
 mod channel;
 mod diagnostics;
 mod download_files;
+mod grant_helper;
 mod model;
 mod network;
 mod platform;
@@ -112,6 +114,22 @@ fn safe_error(text: &str) -> String {
         } else {
             "The browser cookie database could not be accessed. Close the browser and check its profile permissions.".into()
         }
+    } else if cfg!(target_os = "macos")
+        && t.contains("could not find")
+        && t.contains("cookies database")
+    {
+        // yt-dlp says "could not find <browser> cookies database in ..." when macOS refuses access.
+        let name = t
+            .split("could not find ")
+            .nth(1)
+            .and_then(|r| r.split(" cookies database").next())
+            .filter(|n| !n.is_empty() && n.len() < 20)
+            .map(|n| {
+                let mut c = n.chars();
+                c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            })
+            .unwrap_or_else(|| "the browser".into());
+        format!("macOS is blocking Caption Finder from reading {name}’s cookies. Press “Open privacy settings”, drag the icon from the small Caption Finder window into the Full Disk Access list, switch it on, and reopen the app. Or choose a browser without this protection, such as Opera or Vivaldi, or sign in with the app’s own YouTube session.")
     } else if t.contains("cookie decryption failed")
         || t.contains("failed to decrypt")
         || t.contains("could not find") && t.contains("cookie")
@@ -130,6 +148,22 @@ fn safe_error(text: &str) -> String {
     } else {
         "Media operation failed. Check connectivity, video availability, and media tool versions. No automatic whole-video fallback was attempted.".into()
     }
+}
+#[tauri::command]
+fn check_browser_access(browser: String) -> String {
+    browser_access::check(&browser).as_str().into()
+}
+#[tauri::command]
+async fn open_privacy_settings(app: tauri::AppHandle) -> Result<(), String> {
+    grant_helper::open(app).await
+}
+#[tauri::command]
+fn close_grant_helper(app: tauri::AppHandle) {
+    grant_helper::close(&app);
+}
+#[tauri::command]
+fn app_bundle_path() -> Option<String> {
+    grant_helper::own_bundle().map(|p| p.to_string_lossy().into_owned())
 }
 #[tauri::command]
 fn installed_browsers() -> Vec<String> {
@@ -1084,6 +1118,7 @@ pub fn run() {
     }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_drag::init())
         .setup(|app| {
             let log_dir = if platform::portable() {
                 platform::data_dir().map(|p| p.join("Diagnostics"))
@@ -1163,6 +1198,10 @@ pub fn run() {
             copy_youtube_link,
             get_settings,
             installed_browsers,
+            check_browser_access,
+            open_privacy_settings,
+            close_grant_helper,
+            app_bundle_path,
             save_settings,
             pick_folder,
             pick_cookies,
@@ -1309,6 +1348,15 @@ mod configured_route_tests {
 #[cfg(test)]
 mod cookie_error_tests {
     use super::*;
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_missing_cookie_database_is_reported_as_a_macos_block() {
+        let message = safe_error("ERROR: could not find chrome cookies database in \"/Users/x/Library/Application Support/Google/Chrome\"");
+        assert!(message.contains("macOS is blocking"));
+        assert!(message.contains("Chrome’s cookies"));
+        assert!(message.contains("Full Disk Access"));
+        assert!(!message.contains("/Users/x"));
+    }
     #[test]
     fn cookie_database_copy_error_is_separate_from_http_and_decryption() {
         let message=safe_error("ERROR: Could not copy Chrome cookie database. See https://github.com/yt-dlp/yt-dlp/issues/7271");
