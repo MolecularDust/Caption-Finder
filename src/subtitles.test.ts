@@ -111,3 +111,30 @@ describe("repeated occurrences", () => {
     });
   });
 });
+
+describe("non-English phrases", () => {
+  const cue = (text: string, start = 0) => ({ start, end: start + 3, text });
+  const found = (text: string, phrase: string) =>
+    findSubtitleMatches([cue(text)], phrase).length;
+  it("matches Cyrillic regardless of case", () => {
+    expect(found("Это ОДИН из лучших дней", "один")).toBe(1);
+  });
+  it("matches Chinese inside an unspaced sentence", () => {
+    expect(found("我今天去了北京大学", "北京")).toBe(1);
+    expect(found("我今天去了北京大学", "上海")).toBe(0);
+  });
+  it("matches Japanese and Thai without spaces", () => {
+    expect(found("今日はいい天気ですね", "天気")).toBe(1);
+    expect(found("วันนี้อากาศดีมาก", "อากาศ")).toBe(1);
+  });
+  it("ignores Arabic vowel marks", () => {
+    expect(found("مَرْحَبًا بكم", "مرحبا")).toBe(1);
+  });
+  it("keeps Hindi words whole despite vowel signs", () => {
+    expect(found("मुझे हिन्दी पसंद है", "हिन्दी")).toBe(1);
+    expect(found("मुझे हिन्दी पसंद है", "हिन")).toBe(0);
+  });
+  it("still needs whole words for spaced scripts", () => {
+    expect(found("the cat sat", "ca")).toBe(0);
+  });
+});

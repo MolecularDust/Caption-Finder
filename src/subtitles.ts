@@ -1,12 +1,23 @@
 export type Cue = { start: number; end: number; text: string };
 export type Match = { start: number; end: number; text: string };
 export type CaptionTrack = { cues: Cue[]; language: string; kind: string };
-const words = (s: string) =>
+// Scripts written without spaces between words: each character is its own token so a phrase
+// can match in the middle of a run of text.
+export const UNSPACED =
+  "\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Thai}\\p{Script=Lao}\\p{Script=Khmer}\\p{Script=Myanmar}";
+const TOKEN = new RegExp(
+  `[${UNSPACED}]|(?:(?![${UNSPACED}])[\\p{L}\\p{M}\\p{N}])+`,
+  "gu",
+);
+export const words = (s: string) =>
   s
     .normalize("NFKC")
     .toLocaleLowerCase()
+    // Arabic and Hebrew vowel marks and the stretching tatweel are optional in writing.
+    // eslint-disable-next-line no-misleading-character-class -- the marks are removed on purpose
+    .replace(/[\u0640\u064b-\u065f\u0670\u05b0-\u05c7]/g, "")
     .replace(/[’']/g, "")
-    .match(/[\p{L}\p{N}]+/gu) ?? [];
+    .match(TOKEN) ?? [];
 /** Join adjacent cues, suppress overlapping rolling-caption repeats, preserve time provenance. */
 export function findSubtitleMatches(cues: Cue[], phrase: string): Match[] {
   const query = words(phrase);

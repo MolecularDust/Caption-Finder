@@ -20,6 +20,7 @@ export type Settings = {
   browser: string;
   cookiesFile: string;
   appearance: string;
+  playFirstResult?: boolean;
 };
 export type Job = {
   id: string;

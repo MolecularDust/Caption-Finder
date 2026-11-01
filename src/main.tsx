@@ -38,12 +38,22 @@ import {
   type SearchEnd,
   type SearchResult,
 } from "./search";
+import {
+  looksLikeChannel,
+  mergedLister,
+  subscriberText,
+  type ChannelChoice,
+  type ChannelSuggestion,
+} from "./channels";
+import { LANGUAGE_CHOICES, captionLanguages } from "./languages";
 import { ResultsList, Highlight } from "./results";
 import GrantHelper from "./GrantHelper";
 import "./style.css";
 import appIcon from "./assets/app-icon.png";
-const CAPTION_LANGUAGE = "en";
 const RESULT_SLOTS = 25;
+const DEFAULT_SCAN = 50;
+const MAX_SCAN = 1000;
+const validScan = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_SCAN;
 type SearchStatus = {
   state: "idle" | "running" | "done" | "error";
   scanned: number;
@@ -70,12 +80,47 @@ const defaults: Settings = {
   browser: "",
   cookiesFile: "",
   appearance: "system",
+  playFirstResult: false,
 };
 function App() {
   const [settings, setSettings] = useState<Settings>(defaults),
     [showSettings, setShowSettings] = useState(false),
     [browsers, setBrowsers] = useState<string[]>([]),
-    [channel, setChannel] = useState(() => localStorage.getItem("cf.channel") ?? ""),
+    [channel, setChannel] = useState(""),
+    [channels, setChannels] = useState<ChannelChoice[]>(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem("cf.channels") ?? "[]");
+        return Array.isArray(saved)
+          ? saved.filter((c) => c && typeof c.source === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    }),
+    [suggestions, setSuggestions] = useState<ChannelSuggestion[]>([]),
+    [suggesting, setSuggesting] = useState(false),
+    [suggestOpen, setSuggestOpen] = useState(false),
+    [channelNote, setChannelNote] = useState(""),
+    [captionSource, setCaptionSource] = useState<string>(() => {
+      try {
+        const saved = localStorage.getItem("cf.captionSource");
+        return saved === "manual" || saved === "automatic" ? saved : "any";
+      } catch {
+        return "any";
+      }
+    }),
+    [captionLanguage, setCaptionLanguage] = useState<string>(() => {
+      try {
+        return localStorage.getItem("cf.captionLanguage") || "auto";
+      } catch {
+        return "auto";
+      }
+    }),
+    [scanCount, setScanCount] = useState(() => {
+      const saved = Number(localStorage.getItem("cf.scan"));
+      return validScan(saved) ? saved : DEFAULT_SCAN;
+    }),
+    [scanDraft, setScanDraft] = useState<string | null>(null),
     [phrase, setPhrase] = useState(() => localStorage.getItem("cf.phrase") ?? ""),
     [results, setResults] = useState<SearchResult[]>([]),
     [searchedPhrase, setSearchedPhrase] = useState(""),
@@ -373,8 +418,8 @@ function App() {
         return;
       }
       const request = ++matchRequest.current;
-      const code = CAPTION_LANGUAGE;
-      const cacheKey = [id, code, settings.browser, settings.cookiesFile].join(
+      const code = activeLanguage.current;
+      const cacheKey = [id, code, activeSource.current, settings.browser, settings.cookiesFile].join(
         "|",
       );
       setBusy(true);
@@ -387,7 +432,11 @@ function App() {
           const { video: v, track } = await invoke<{
             video: Video;
             track: CaptionTrack;
-          }>("caption_track", { url, language: code });
+          }>("caption_track", {
+            url,
+            language: code,
+            source: activeSource.current,
+          });
           if (request === matchRequest.current && id === candidateRef.current) {
             setVideo(v);
             if (!video || video.id !== id) {
@@ -441,14 +490,16 @@ function App() {
       }
     });
   const playerStart = useRef(0);
-  const selectResult = (r: SearchResult) => {
+  const playerAutoplay = useRef(true);
+  const selectResult = (r: SearchResult, autoOpened = false) => {
+    playerAutoplay.current = !(autoOpened && !settings.playFirstResult);
     const first = r.matches[0];
     candidateRef.current = r.video.id;
     matchRequest.current++;
     selectionGeneration.current++;
     dirtyName.current = false;
     captionCache.current.set(
-      [r.video.id, CAPTION_LANGUAGE, settings.browser, settings.cookiesFile].join("|"),
+      [r.video.id, activeLanguage.current, activeSource.current, settings.browser, settings.cookiesFile].join("|"),
       { video: r.video, track: r.track },
     );
     playerStart.current = Math.max(0, first.start - 2);
@@ -475,10 +526,114 @@ function App() {
     setFileNameEdited(true);
     selectMatch(first, r.video);
   };
+  // The caption kind a search was started with, so its results and the video later opened
+  // from them agree even if the setting is changed meanwhile.
+  const activeSource = useRef(captionSource);
+  const activeLanguage = useRef("auto");
+  const removedSources = useRef(new Set<string>());
+  const suggestRequest = useRef(0);
+  const saveChannels = (next: ChannelChoice[]) => {
+    setChannels(next);
+    try {
+      localStorage.setItem("cf.channels", JSON.stringify(next));
+    } catch {
+      /* remembering the channels is only a convenience */
+    }
+  };
+  const addChannel = (choice: ChannelChoice) => {
+    if (!channels.some((c) => c.source === choice.source))
+      saveChannels([...channels, choice]);
+    suggestRequest.current++;
+    setChannel("");
+    setSuggestions([]);
+    setSuggesting(false);
+    setSuggestOpen(false);
+    setChannelNote("");
+  };
+  // Removing a channel also drops what it contributed to the results.
+  const removeChannel = (c: ChannelChoice) => {
+    saveChannels(channels.filter((x) => x !== c));
+    removedSources.current.add(c.source);
+    setResults((old) => old.filter((r) => r.source !== c.source));
+    const shown = results.find((r) => r.video.id === candidateRef.current);
+    if (shown?.source === c.source) {
+      matchRequest.current++;
+      candidateRef.current = "";
+      setSelectedId("");
+      setCandidate("");
+      setVideo(null);
+      setMatches([]);
+      setSelectedLine("");
+      setFileName("");
+      setLocal(null);
+    }
+  };
+  const addSuggestion = (c: ChannelSuggestion) =>
+    addChannel({
+      source: `https://www.youtube.com/channel/${c.id}`,
+      title: c.title,
+      subscribers: c.subscribers,
+      thumbnail: c.thumbnail,
+    });
+  // Look channels up by name as the user types, after a short pause.
+  useEffect(() => {
+    const text = channel.trim();
+    const request = ++suggestRequest.current;
+    setChannelNote("");
+    if (!isTauri() || text.length < 2 || looksLikeChannel(text)) {
+      setSuggestions([]);
+      setSuggesting(false);
+      return;
+    }
+    setSuggesting(true);
+    const timer = window.setTimeout(() => {
+      invoke<ChannelSuggestion[]>("find_channels", { query: text })
+        .then((found) => {
+          if (request !== suggestRequest.current) return;
+          setSuggestions(found);
+          setChannelNote(found.length ? "" : "No channels found.");
+        })
+        .catch((e) => {
+          if (request === suggestRequest.current) {
+            setSuggestions([]);
+            setChannelNote(String(e));
+          }
+        })
+        .finally(() => {
+          if (request === suggestRequest.current) setSuggesting(false);
+        });
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [channel]);
+  const submitChannelText = () => {
+    const text = channel.trim();
+    if (!text) return;
+    if (looksLikeChannel(text)) addChannel({ source: text, title: text.replace(/^https?:\/\/(www\.)?youtube\.com\//i, "").replace(/\/videos\/?$/, "") });
+    else if (suggestions[0]) addSuggestion(suggestions[0]);
+  };
   const runSearch = async () => {
-    const text = phrase.trim(),
-      source = channel.trim();
-    if (!text || !source) return;
+    const text = phrase.trim();
+    const pending = channel.trim();
+    const source = captionSource;
+    const language = captionLanguages(text, captionLanguage);
+    const sources = [
+      ...channels.map((c) => c.source),
+      ...(looksLikeChannel(pending) && !channels.some((c) => c.source === pending)
+        ? [pending]
+        : []),
+    ];
+    if (!text) return;
+    if (!sources.length) {
+      setSearchStatus({
+        state: "error",
+        scanned: 0,
+        found: 0,
+        message: pending
+          ? "Pick a channel from the suggestions first."
+          : "Add at least one channel to search.",
+      });
+      return;
+    }
     if (!isTauri()) {
       setSearchStatus({
         state: "error",
@@ -489,14 +644,17 @@ function App() {
       return;
     }
     try {
-      localStorage.setItem("cf.channel", source);
       localStorage.setItem("cf.phrase", text);
+      localStorage.setItem("cf.scan", String(scanCount));
     } catch {
       /* remembering the last search is only a convenience */
     }
+    activeSource.current = source;
+    activeLanguage.current = language;
     searchAbort.current?.abort();
     const control = new AbortController();
     searchAbort.current = control;
+    removedSources.current.clear();
     matchRequest.current++;
     candidateRef.current = "";
     setResults([]);
@@ -507,26 +665,33 @@ function App() {
     setMatches([]);
     setSelectedLine("");
     setFileName("");
+    if (looksLikeChannel(pending) && !channels.some((c) => c.source === pending))
+      addChannel({ source: pending, title: pending });
     setSearchedPhrase(text);
     setSearchStatus({ state: "running", scanned: 0, found: 0 });
     try {
       const outcome = await searchChannel(
         {
-          list: (from, count) =>
-            invoke<ChannelEntry[]>("list_channel", {
-              channel: source,
-              from,
-              count,
-            }),
+          list: mergedLister(
+            (source, from, count) =>
+              invoke<ChannelEntry[]>("list_channel", {
+                channel: source,
+                from,
+                count,
+              }),
+            sources,
+            scanCount,
+          ),
           captions: async (id) => {
-            const key = [id, CAPTION_LANGUAGE, settings.browser, settings.cookiesFile].join("|");
+            const key = [id, language, source, settings.browser, settings.cookiesFile].join("|");
             const cached = captionCache.current.get(key);
             if (cached) return cached;
             const found = await invoke<{ video: Video; track: CaptionTrack }>(
               "caption_track",
               {
                 url: `https://www.youtube.com/watch?v=${id}`,
-                language: CAPTION_LANGUAGE,
+                language,
+                source,
               },
             );
             captionCache.current.set(key, found);
@@ -537,10 +702,11 @@ function App() {
         {
           limit: RESULT_SLOTS,
           batch: 30,
-          cap: 400,
+          cap: scanCount * sources.length,
           concurrency: 3,
           signal: control.signal,
           onResult: (r) =>
+            !removedSources.current.has(r.source ?? "") &&
             setResults((old) => [...old, r].sort((a, b) => a.order - b.order)),
           onSettled: (upTo) => setSettled(upTo),
           onProgress: (scanned, found) =>
@@ -568,7 +734,7 @@ function App() {
   // later video that happens to finish first would be selected and then sit below others.
   useEffect(() => {
     if (!candidate && results.length > 0 && settled >= results[0].order)
-      selectResult(results[0]);
+      selectResult(results[0], true);
   }, [results, settled]);
   // macOS can refuse this app access to a browser's cookies; ask, and recheck when the user
   // comes back from System Settings.
@@ -714,19 +880,72 @@ function App() {
               if (searchStatus.state !== "running") void runSearch();
             }}
           >
-            <label className="field" htmlFor="channel">
-              <span>YouTube channel</span>
-              <input
-                id="channel"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                value={channel}
-                onChange={(e) => setChannel(e.target.value)}
-                placeholder="Channel link or @handle"
-                required
-              />
-            </label>
+            <div className="channel-box">
+              <label className="field" htmlFor="channel">
+                <span>YouTube channel{channels.length > 0 ? "s" : ""}</span>
+                <input
+                  id="channel"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={channel}
+                  onChange={(e) => {
+                    setChannel(e.target.value);
+                    setSuggestOpen(true);
+                  }}
+                  onFocus={() => setSuggestOpen(true)}
+                  onBlur={() => window.setTimeout(() => setSuggestOpen(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && channel.trim()) {
+                      e.preventDefault();
+                      submitChannelText();
+                    } else if (e.key === "Escape") setSuggestOpen(false);
+                  }}
+                  placeholder={
+                    channels.length
+                      ? "Add another channel"
+                      : "Channel name, link or @handle"
+                  }
+                />
+              </label>
+              {suggestOpen && (suggesting || suggestions.length > 0 || channelNote) && (
+                <ul className="suggestions" role="listbox">
+                  {suggesting && (
+                    <li className="note looking">
+                      <span className="spinner" aria-hidden="true" />
+                      Looking up channels<span className="dots" aria-hidden="true" />
+                    </li>
+                  )}
+                  {!suggesting && channelNote && <li className="note">{channelNote}</li>}
+                  {suggestions.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected="false"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => addSuggestion(c)}
+                      >
+                        {c.thumbnail ? (
+                          <img src={c.thumbnail} alt="" />
+                        ) : (
+                          <span className="avatar" />
+                        )}
+                        <span>
+                          <strong>{c.title}</strong>
+                          <small>
+                            {[subscriberText(c.subscribers) && `${subscriberText(c.subscribers)} subs`, c.handle]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </small>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <div className="phrase-group">
               <label className="field" htmlFor="phrase">
                 <span>Search phrase</span>
@@ -743,19 +962,42 @@ function App() {
               </label>
               {searchStatus.state === "running" ? (
                 <button
+                  key="stop"
                   className="search-button"
                   type="button"
                   onClick={cancelSearch}
                 >
+                  <span className="spinner" aria-hidden="true" />
                   Stop
                 </button>
               ) : (
-                <button className="primary search-button" type="submit">
+                <button
+                  key="search"
+                  className="primary search-button"
+                  type="submit"
+                >
                   Search →
                 </button>
               )}
             </div>
           </form>
+          {channels.length > 0 && (
+            <div className="channel-chips" aria-label="Channels to search">
+              {channels.map((c) => (
+                <span className="chip" key={c.source}>
+                  {c.title}
+                  {c.subscribers ? <small>{subscriberText(c.subscribers)}</small> : null}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${c.title}`}
+                    onClick={() => removeChannel(c)}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </section>
         <div className="panes">
           <section className="results-card" aria-label="Matching videos">
@@ -856,7 +1098,7 @@ function App() {
                 ref={iframe}
                 key={candidate}
                 title="YouTube player"
-                src={`${origin}/player?token=${token.current}&id=${candidate}&start=${playerStart.current.toFixed(2)}`}
+                src={`${origin}/player?token=${token.current}&id=${candidate}&start=${playerStart.current.toFixed(2)}&play=${playerAutoplay.current ? 1 : 0}`}
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
@@ -1453,6 +1695,7 @@ function App() {
               <p>{settings.destination || "Choose a download folder"}</p>
             </div>
             <button
+              className={settings.destination ? undefined : "attention"}
               onClick={() =>
                 act(async () => {
                   const p = await invoke<string | null>("pick_folder");
@@ -1807,6 +2050,93 @@ function App() {
               retrieval and downloads; the player uses the app’s own sign-in
               above.
             </p>
+            <Field label="Videos to scan per search">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_SCAN}
+                step={1}
+                value={scanDraft ?? scanCount}
+                onChange={(e) => {
+                  setScanDraft(e.target.value);
+                  const n = Number(e.target.value);
+                  if (e.target.value.trim() && validScan(n)) {
+                    setScanCount(n);
+                    try {
+                      localStorage.setItem("cf.scan", String(n));
+                    } catch {
+                      /* remembering the choice is only a convenience */
+                    }
+                  }
+                }}
+                onBlur={() => setScanDraft(null)}
+              />
+              <small>
+                Newest videos checked per search, 1–{MAX_SCAN}. Default{" "}
+                {DEFAULT_SCAN}.
+              </small>
+            </Field>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={!settings.playFirstResult}
+                onChange={(e) =>
+                  act(() =>
+                    save({ ...settings, playFirstResult: !e.target.checked }),
+                  )
+                }
+              />
+              <span>Don’t play the first found video automatically</span>
+            </label>
+            <Field label="Caption language">
+              <select
+                value={captionLanguage}
+                onChange={(e) => {
+                  setCaptionLanguage(e.target.value);
+                  try {
+                    localStorage.setItem("cf.captionLanguage", e.target.value);
+                  } catch {
+                    /* remembering the choice is only a convenience */
+                  }
+                }}
+              >
+                <option value="auto">
+                  Automatic (from the search phrase)
+                </option>
+                {LANGUAGE_CHOICES.map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <small>
+                Automatic follows the phrase’s alphabet, or the language each
+                video is spoken in for Latin letters. Pick a language to search
+                its captions or dubbed audio tracks.
+              </small>
+            </Field>
+            <Field label="Search in captions">
+              <select
+                value={captionSource}
+                onChange={(e) => {
+                  setCaptionSource(e.target.value);
+                  try {
+                    localStorage.setItem("cf.captionSource", e.target.value);
+                  } catch {
+                    /* remembering the choice is only a convenience */
+                  }
+                }}
+              >
+                <option value="any">Either (uploaded captions preferred)</option>
+                <option value="manual">Uploaded (manual) captions only</option>
+                <option value="automatic">Automatic captions only</option>
+              </select>
+              <small>
+                Applies to the next search. Videos without the chosen kind are
+                skipped.
+              </small>
+            </Field>
             <Field label="Appearance">
               <select
                 value={settings.appearance}

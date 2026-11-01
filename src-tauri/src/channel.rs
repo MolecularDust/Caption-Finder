@@ -57,6 +57,70 @@ pub fn channel_url(input: &str) -> Result<String, String> {
     Err("Use a channel link or an @handle, for example @TED".into())
 }
 
+fn percent_encode(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+/// Channels whose names match `query`, best match first, for the channel suggestion list.
+pub fn find(settings: Settings, query: &str) -> Result<Vec<Value>, String> {
+    let query = query.trim();
+    if query.chars().count() < 2 || query.len() > 100 {
+        return Ok(Vec::new());
+    }
+    // `sp` limits YouTube's search results to channels.
+    let url = format!(
+        "https://www.youtube.com/results?search_query={}&sp=EgIQAg%3D%3D",
+        percent_encode(query)
+    );
+    let mut c = base(&settings)?;
+    c.args([
+        "--flat-playlist",
+        "--dump-json",
+        "--sleep-requests",
+        "0",
+        "--playlist-end",
+        "8",
+        "--",
+        &url,
+    ])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+    let o = platform::output(&mut c).map_err(|_| "Cannot start yt-dlp")?;
+    let stderr = String::from_utf8_lossy(&o.stderr).into_owned();
+    crate::diagnostics::log(
+        crate::diagnostics::Stage::ChannelList,
+        &settings,
+        o.status.code(),
+        &stderr,
+    );
+    Ok(String::from_utf8_lossy(&o.stdout)
+        .lines()
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .filter_map(|v| {
+            let id = v["channel_id"].as_str().or_else(|| v["id"].as_str())?;
+            id.starts_with("UC").then(|| {
+                let thumbnail = v["thumbnails"][0]["url"].as_str().map(|u| {
+                    if u.starts_with("//") { format!("https:{u}") } else { u.to_string() }
+                });
+                json!({
+                    "id": id,
+                    "title": v["title"],
+                    "handle": v["uploader_id"],
+                    "subscribers": v["channel_follower_count"],
+                    "thumbnail": thumbnail,
+                })
+            })
+        })
+        .collect())
+}
+
 /// One page of a channel's videos, newest first. Entries are 1-based and inclusive.
 pub fn list(settings: Settings, channel: &str, from: u32, count: u32) -> Result<Vec<Value>, String> {
     let url = channel_url(channel)?;
@@ -169,5 +233,16 @@ mod tests {
         assert!(channel_url("https://www.youtube.com/watch?v=abcdefghijk").is_err());
         assert!(channel_url("two words").is_err());
         assert!(channel_url("@a/../b").is_err());
+    }
+}
+
+#[cfg(test)]
+mod find_tests {
+    use super::percent_encode;
+    #[test]
+    fn encodes_queries_for_a_url() {
+        assert_eq!(percent_encode("TED talks"), "TED%20talks");
+        assert_eq!(percent_encode("a&b=c"), "a%26b%3Dc");
+        assert_eq!(percent_encode("é"), "%C3%A9");
     }
 }

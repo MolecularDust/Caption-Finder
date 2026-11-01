@@ -216,8 +216,10 @@ async fn caption_track(
     app: tauri::AppHandle,
     url: String,
     language: String,
+    source: Option<String>,
     s: State<'_, Backend>,
 ) -> Result<serde_json::Value, String> {
+    let source = source.unwrap_or_default();
     let settings = s.settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let settings = session::prepare(&app, settings)?;
     let cache = if platform::portable() {
@@ -230,7 +232,7 @@ async fn caption_track(
     .join("captions");
 
     let (value, raw) =
-        tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, settings, cache))
+        tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, source, settings, cache))
             .await
             .map_err(|_| "Caption worker stopped".to_string())??;
     // Keep the full metadata so the download of this video can skip extracting it again.
@@ -238,6 +240,18 @@ async fn caption_track(
         s.metadata.put(id, raw);
     }
     Ok(value)
+}
+#[tauri::command]
+async fn find_channels(
+    app: tauri::AppHandle,
+    query: String,
+    s: State<'_, Backend>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
+    tauri::async_runtime::spawn_blocking(move || channel::find(settings, &query))
+        .await
+        .map_err(|_| "Channel worker stopped".to_string())?
 }
 #[tauri::command]
 async fn list_channel(
@@ -1242,6 +1256,7 @@ pub fn run() {
             make_preview,
             analyze,
             list_channel,
+            find_channels,
             caption_track,
             enqueue,
             jobs,

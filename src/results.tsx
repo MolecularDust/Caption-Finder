@@ -1,14 +1,23 @@
 import { timestamp } from "./domain";
 import type { SearchResult } from "./search";
+import { UNSPACED, words } from "./subtitles";
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Marks the searched phrase inside a caption line, ignoring case and punctuation between words. */
 export function Highlight({ line, phrase }: { line: string; phrase: string }) {
-  const words = phrase.match(/[\p{L}\p{N}']+/gu) ?? [];
-  if (!words.length) return <>{line}</>;
+  const tokens = words(phrase);
+  if (!tokens.length) return <>{line}</>;
+  const unspaced = new RegExp(`[${UNSPACED}]`, "u");
+  // Words need a separator between them; characters of unspaced scripts don't.
   const pattern = new RegExp(
-    `(${words.map(escape).join("[^\\p{L}\\p{N}']+")})`,
+    `(${tokens
+      .map((t, i) => {
+        const gap =
+          i === 0 ? "" : unspaced.test(t) || unspaced.test(tokens[i - 1]) ? "[^\\p{L}\\p{M}\\p{N}]*" : "[^\\p{L}\\p{M}\\p{N}]+";
+        return gap + escape(t);
+      })
+      .join("")})`,
     "iu",
   );
   const [before, hit, ...rest] = line.split(pattern);

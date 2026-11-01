@@ -6,11 +6,19 @@ import {
   type Match,
 } from "./subtitles";
 
-export type ChannelEntry = { id: string; title?: string; duration?: number };
+export type ChannelEntry = {
+  id: string;
+  title?: string;
+  duration?: number;
+  /** which of the searched channels the video came from */
+  source?: string;
+};
 export type SearchResult = {
   /** position in the channel's newest-first list */
   order: number;
   video: Video;
+  /** the channel (as it was entered) this result came from */
+  source?: string;
   track: CaptionTrack;
   matches: Match[];
   /** caption text around the first match */
@@ -97,7 +105,7 @@ export async function searchChannel(
     reason: SearchEnd = "cap";
   for (let from = 1; from <= cap; from += batch) {
     if (signal.aborted) return { scanned, found, reason: "cancelled" };
-    const entries = await deps.list(from, batch);
+    const entries = await deps.list(from, Math.min(batch, cap - from + 1));
     if (signal.aborted) return { scanned, found, reason: "cancelled" };
     if (!entries.length) {
       reason = "exhausted";
@@ -118,6 +126,7 @@ export async function searchChannel(
             options.onResult({
               order: from - 1 + index,
               video,
+              source: entries[index].source,
               track,
               matches,
               line: matchLine(track.cues, matches[0]),

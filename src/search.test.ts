@@ -146,3 +146,33 @@ describe("matchLine", () => {
     expect(matchLine(cues, { start: 2, end: 4, text: "" })).toBe("we will visit");
   });
 });
+
+describe("scan size", () => {
+  it("never scans more videos than the cap, even when it isn't a multiple of the batch", async () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `v${i}`);
+    const base = deps(ids, {});
+    const asked: number[] = [];
+    const outcome = await searchChannel(
+      {
+        ...base,
+        list: async (from, count) => {
+          asked.push(count);
+          return base.list(from, count);
+        },
+      },
+      "zzz",
+      {
+        limit: 25,
+        batch: 30,
+        cap: 50,
+        concurrency: 2,
+        backoffMs: 1,
+        signal: new AbortController().signal,
+        onResult: () => {},
+        onProgress: () => {},
+      },
+    );
+    expect(asked).toEqual([30, 20]);
+    expect(outcome.scanned).toBe(40);
+  });
+});

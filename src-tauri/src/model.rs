@@ -8,6 +8,10 @@ pub struct Settings {
     pub browser: String,
     pub cookies_file: String,
     pub appearance: String,
+    /// Start playing the top result as soon as it opens. Off by default; results the user
+    /// clicks always play.
+    #[serde(default)]
+    pub play_first_result: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

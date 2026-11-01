@@ -1180,6 +1180,23 @@ fieldset.clip-controls:disabled,
 .search-button {
   height: 40px;
   padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.search-button .spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: analyze-spin 0.75s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-button .spinner {
+    animation-duration: 2s;
+  }
 }
 .panes {
   display: grid;
@@ -1451,4 +1468,152 @@ body:has(.helper) {
   height: 100%;
   object-fit: contain;
   background: #000;
+}
+
+/* Draws the eye to "Choose folder…" while a missing folder is what keeps downloads disabled. */
+button.attention {
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: attention-pulse 1.6s ease-in-out infinite;
+}
+@keyframes attention-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px transparent;
+    transform: scale(1.04);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button.attention {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+.channel-box {
+  position: relative;
+  min-width: 0;
+}
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--panel, #fff);
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+.suggestions .note {
+  padding: 10px 12px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.suggestions button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-radius: 7px;
+  height: auto;
+}
+.suggestions button:hover {
+  background: var(--input);
+}
+.suggestions img,
+.suggestions .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--input);
+}
+.suggestions strong,
+.suggestions small {
+  display: block;
+}
+.suggestions small {
+  opacity: 0.65;
+  font-size: 11px;
+}
+.channel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  max-width: calc(50% - 8px);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: var(--input);
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  font-size: 12px;
+}
+.chip small {
+  opacity: 0.6;
+}
+.chip button {
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+  height: auto;
+  line-height: 1;
+  font-size: 15px;
+  cursor: pointer;
+  color: inherit;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.check-row input {
+  width: auto;
+}
+
+.suggestions .looking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.suggestions .looking .spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: analyze-spin 0.75s linear infinite;
+}
+.dots::after {
+  content: "";
+  animation: lookup-dots 1.2s steps(4, end) infinite;
+}
+@keyframes lookup-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .suggestions .looking .spinner { animation-duration: 2s; }
+  .dots::after { animation: none; content: "…"; }
 }

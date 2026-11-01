@@ -222,6 +222,7 @@ mod tests {
             cookies_file: "SECRET_PATH".into(),
             destination: "SECRET_DESTINATION".into(),
             appearance: String::new(),
+            play_first_result: false,
         };
         let value=serde_json::to_string(&record(Stage::Download,&s,Some(1),"Cookie: SECRET_COOKIE Authorization: SECRET_TOKEN https://user:password@example.com/?token=SECRET_URL IP 1.2.3.4 /Users/SECRET_PATH HTTP Error 429")).unwrap();
         for secret in ["SECRET", "password", "example.com", "1.2.3.4", "/Users/"] {

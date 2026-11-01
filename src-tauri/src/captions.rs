@@ -7,8 +7,54 @@ impl Drop for TempDir {
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
-fn track(v: &Value, language: &str) -> Option<(String, bool)> {
-    let manual = v["subtitles"].as_object();
+/// The language a video is spoken in, so a search phrase in that language can be matched:
+/// YouTube's own language tag first, else the language of an original automatic caption.
+fn spoken_language(v: &Value) -> String {
+    if let Some(l) = v["language"].as_str().filter(|l| !l.is_empty()) {
+        return l.to_string();
+    }
+    v["automatic_captions"]
+        .as_object()
+        .and_then(|m| m.keys().find_map(|k| k.strip_suffix("-orig")))
+        .unwrap_or("en")
+        .to_string()
+}
+/// `language` is "auto" or a comma-separated list of codes in order of preference.
+fn valid_languages(list: &str) -> bool {
+    !list.is_empty() && list.len() <= 200 && list.split(',').all(valid_language)
+}
+/// The first wanted language the video has a usable track for. Videos with dubbed audio carry
+/// an original caption track per dubbed language, so a Russian phrase can match a Russian dub
+/// of an English video. "auto" means the language the video is spoken in.
+fn choose_language(v: &Value, wanted: &str, source: &str) -> Option<(String, String, bool)> {
+    let wanted: Vec<String> = if wanted == "auto" {
+        vec![spoken_language(v)]
+    } else {
+        wanted.split(',').map(str::to_string).collect()
+    };
+    for code in wanted {
+        let primary = code.split('-').next().unwrap_or(&code).to_string();
+        for candidate in [code.clone(), primary] {
+            if let Some((key, automatic)) = track(v, &candidate, source) {
+                return Some((candidate, key, automatic));
+            }
+        }
+    }
+    None
+}
+fn valid_language(code: &str) -> bool {
+    code == "auto"
+        || (!code.is_empty()
+            && code.len() <= 12
+            && code.split('-').all(|part| {
+                !part.is_empty() && part.bytes().all(|c| c.is_ascii_alphanumeric())
+            })
+            && code.as_bytes()[0].is_ascii_alphabetic())
+}
+/// `source` limits the choice: "manual" (uploaded captions only), "automatic" (YouTube's
+/// speech recognition only) or anything else for either, preferring uploaded captions.
+fn track(v: &Value, language: &str, source: &str) -> Option<(String, bool)> {
+    let manual = v["subtitles"].as_object().filter(|_| source != "automatic");
     if let Some(map) = manual {
         let mut keys = map
             .keys()
@@ -18,6 +64,9 @@ fn track(v: &Value, language: &str) -> Option<(String, bool)> {
         if let Some(k) = keys.first() {
             return Some(((*k).clone(), false));
         }
+    }
+    if source == "manual" {
+        return None;
     }
     let auto = v["automatic_captions"].as_object()?;
     for key in [format!("{language}-orig"), language.to_string()] {
@@ -38,12 +87,12 @@ fn track(v: &Value, language: &str) -> Option<(String, bool)> {
 pub fn retrieve(
     url: String,
     language: String,
+    source: String,
     settings: Settings,
     cache: PathBuf,
 ) -> Result<(Value, Vec<u8>), String> {
     let normalized = crate::model::normalize(&url)?;
-    if language.len() > 3 || language.len() < 2 || !language.bytes().all(|c| c.is_ascii_lowercase())
-    {
+    if !valid_languages(&language) {
         return Err("Unsupported caption language code".into());
     }
     let mut c = base(&settings)?;
@@ -74,9 +123,11 @@ pub fn retrieve(
     {
         return Err("Choose a finished video with a finite duration.".into());
     }
-    let (code, automatic) = track(&v, &language).ok_or(
-        "No supplied or original automatic captions in this language. Translations are not used.",
-    )?;
+    let (_, code, automatic) = choose_language(&v, &language, &source).ok_or(match source.as_str() {
+        "manual" => "No uploaded captions in this language. Translations are not used.",
+        "automatic" => "No original automatic captions in this language. Translations are not used.",
+        _ => "No supplied or original automatic captions in this language. Translations are not used.",
+    })?;
     let dir = TempDir(cache.join(uuid::Uuid::new_v4().to_string()));
     std::fs::create_dir_all(&dir.0).map_err(|_| "Cannot create temporary subtitle folder")?;
     // Reuse the extraction, including signed caption URLs and request headers.
@@ -175,10 +226,10 @@ mod tests {
     #[test]
     fn manual_first_and_no_translation() {
         let v = json!({"subtitles":{"en-custom":[{}]},"automatic_captions":{"en-orig":[{"url":"https://example.org/a?lang=en"}]}});
-        assert_eq!(track(&v, "en"), Some(("en-custom".into(), false)));
+        assert_eq!(track(&v, "en", "any"), Some(("en-custom".into(), false)));
         let v =
             json!({"automatic_captions":{"en":[{"url":"https://example.org/a?lang=es&tlang=en"}]}});
-        assert_eq!(track(&v, "en"), None);
+        assert_eq!(track(&v, "en", "any"), None);
     }
 }
 
@@ -196,6 +247,7 @@ mod network_tests {
         let (result, _) = retrieve(
             "https://www.youtube.com/watch?v=H14bBuluwB8".into(),
             "en".into(),
+            "any".into(),
             Settings::default(),
             cache.clone(),
         )
@@ -207,5 +259,60 @@ mod network_tests {
         println!("{log}");
         assert!(log.contains("\"duration_ms\""));
         std::fs::remove_dir_all(diagnostics).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod language_tests {
+    use super::{choose_language, spoken_language, track, valid_language, valid_languages};
+    use serde_json::json;
+    #[test]
+    fn accepts_auto_and_region_codes_only() {
+        for ok in ["auto", "en", "zh-Hans", "pt-BR", "iw"] {
+            assert!(valid_language(ok), "{ok}");
+        }
+        for bad in ["", "-en", "en/../x", "e n", "1en", "averyveryverylongcode"] {
+            assert!(!valid_language(bad), "{bad}");
+        }
+    }
+    #[test]
+    fn spoken_language_prefers_the_video_tag_then_original_captions() {
+        assert_eq!(spoken_language(&json!({"language": "ru"})), "ru");
+        assert_eq!(
+            spoken_language(&json!({"language": null, "automatic_captions": {"ar": [], "ar-orig": []}})),
+            "ar"
+        );
+        assert_eq!(spoken_language(&json!({})), "en");
+    }
+    #[test]
+    fn caption_source_limits_which_track_is_used() {
+        let v = json!({
+            "subtitles": {"en": [{"url": "https://x/y"}]},
+            "automatic_captions": {"en-orig": [{"url": "https://x/z"}]}
+        });
+        assert_eq!(track(&v, "en", "any"), Some(("en".into(), false)));
+        assert_eq!(track(&v, "en", "manual"), Some(("en".into(), false)));
+        assert_eq!(track(&v, "en", "automatic"), Some(("en-orig".into(), true)));
+        let only_auto = json!({"automatic_captions": {"en-orig": [{"url": "https://x/z"}]}});
+        assert_eq!(track(&only_auto, "en", "manual"), None);
+        assert_eq!(track(&only_auto, "en", "any"), Some(("en-orig".into(), true)));
+    }
+    #[test]
+    fn dubbed_languages_are_found_and_region_tags_fall_back() {
+        let v = json!({
+            "language": "en-US",
+            "automatic_captions": {
+                "en-orig": [{"url": "https://x/a"}],
+                "ru-orig": [{"url": "https://x/b"}],
+                "ru": [{"url": "https://x/b?tlang=ru"}]
+            }
+        });
+        // The spoken language "en-US" falls back to "en".
+        assert_eq!(choose_language(&v, "auto", "any").unwrap().1, "en-orig");
+        // A Russian phrase finds the Russian dub; a Ukrainian-first list falls through to it.
+        assert_eq!(choose_language(&v, "uk,ru", "any").unwrap().1, "ru-orig");
+        assert!(choose_language(&v, "ar,fa", "any").is_none());
+        assert!(valid_languages("ru,uk,bg"));
+        assert!(!valid_languages("ru,,uk"));
     }
 }
