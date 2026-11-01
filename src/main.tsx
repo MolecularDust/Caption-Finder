@@ -121,6 +121,15 @@ function App() {
         return "any";
       }
     }),
+    [loadingStyle, setLoadingStyle] = useState<string>(() => {
+      try {
+        return localStorage.getItem("cf.loadingStyle") === "thumbnail"
+          ? "thumbnail"
+          : "spinner";
+      } catch {
+        return "spinner";
+      }
+    }),
     [mixChannels, setMixChannels] = useState<boolean>(() => {
       try {
         return localStorage.getItem("cf.mixChannels") === "1";
@@ -218,9 +227,10 @@ function App() {
     localVideo = useRef<HTMLVideoElement>(null),
     timeline = useRef<HTMLDivElement>(null);
   // Commands go to the local preview when one is showing, else to YouTube's embedded player.
-  const send = (action: string, value?: number) => {
+  const send = (action: string, value?: unknown) => {
     const v = localVideo.current;
     if (local && v) {
+      if (action === "load") return;
       if (action === "seek" && typeof value === "number")
         v.currentTime = Math.max(
           0,
@@ -327,10 +337,7 @@ function App() {
       setPreviewActive(false);
     }
     if (type === "state" && value === 1) setPlayerError("");
-    // The player's one-time "ready" message can be missed (a reselected result keeps its
-    // player); position and state updates prove it is running.
-    if (type === "ready" || ((type === "time" || type === "state") && !playerError))
-      setReady(true);
+    if (type === "ready") setReady(true);
     if (type === "error") {
       setReady(false);
       previewing.current = false;
@@ -512,7 +519,28 @@ function App() {
       }
     });
   const playerStart = useRef(0);
+  // One player page serves every video; later videos are loaded into it by message, so it is
+  // only rebuilt when the video area is emptied (a new search).
+  const frameSrc = useRef("");
+  const frameVideo = useRef("");
   const playerAutoplay = useRef(true);
+  if (local || !candidate || !origin) {
+    frameSrc.current = "";
+    frameVideo.current = "";
+  } else if (!frameSrc.current) {
+    frameSrc.current = `${origin}/player?token=${token.current}&id=${candidate}&start=${playerStart.current.toFixed(2)}&play=${playerAutoplay.current ? 1 : 0}`;
+    frameVideo.current = candidate;
+  }
+  useEffect(() => {
+    if (candidate && frameSrc.current && frameVideo.current !== candidate) {
+      frameVideo.current = candidate;
+      send("load", {
+        id: candidate,
+        start: playerStart.current,
+        play: playerAutoplay.current,
+      });
+    }
+  }, [candidate]);
   const selectResult = (r: SearchResult, autoOpened = false) => {
     playerAutoplay.current = !(autoOpened && !settings.playFirstResult);
     const first = r.matches[0];
@@ -533,7 +561,9 @@ function App() {
     setCandidate(r.video.id);
     setSelectedLine(r.line);
     setPlayerError("");
-    setReady(false);
+    // Reselecting the video already in the player keeps it ready: nothing is reloaded.
+    if (frameVideo.current !== r.video.id || local) setReady(false);
+    else send("seek", playerStart.current);
     setPreviewMode(true);
     setPreviewActive(false);
     previewing.current = false;
@@ -1206,15 +1236,34 @@ function App() {
                 }
               />
             ) : candidate && origin ? (
+              <>
+                {/* Until the new player is up, show the video's own thumbnail: a player being
+                    rebuilt would otherwise flash empty and black. */}
+                {loadingStyle === "spinner" ? (
+                  <div className="player-poster player-spinner" aria-hidden="true">
+                    <span className="spinner" />
+                  </div>
+                ) : (
+                  <img
+                    className="player-poster"
+                    src={
+                      results.find((r) => r.video.id === candidate)?.video
+                        .thumbnail ||
+                      `https://i.ytimg.com/vi/${candidate}/mqdefault.jpg`
+                    }
+                    alt=""
+                  />
+                )}
               <iframe
+                className={ready || playerError ? "player-live" : "player-loading"}
                 ref={iframe}
-                key={candidate}
                 title="YouTube player"
-                src={`${origin}/player?token=${token.current}&id=${candidate}&start=${playerStart.current.toFixed(2)}&play=${playerAutoplay.current ? 1 : 0}`}
+                src={frameSrc.current}
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
               />
+              </>
             ) : (
               <div className="empty-player">
                 <div className="play-symbol">▶</div>
@@ -2201,6 +2250,22 @@ function App() {
               />
               <span>Don’t play the first found video automatically</span>
             </label>
+            <Field label="While a video loads">
+              <select
+                value={loadingStyle}
+                onChange={(e) => {
+                  setLoadingStyle(e.target.value);
+                  try {
+                    localStorage.setItem("cf.loadingStyle", e.target.value);
+                  } catch {
+                    /* remembering the choice is only a convenience */
+                  }
+                }}
+              >
+                <option value="thumbnail">Show Thumbnail</option>
+                <option value="spinner">Show Spinner</option>
+              </select>
+            </Field>
             <Field label="Results from several channels">
               <select
                 value={mixChannels ? "mix" : "sequential"}
