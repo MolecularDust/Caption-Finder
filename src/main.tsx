@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
   safeFileName,
@@ -84,6 +84,12 @@ function App() {
       scanned: 0,
       found: 0,
     }),
+    [local, setLocal] = useState<{
+      url: string;
+      offset: number;
+      length: number;
+    } | null>(null),
+    [localStatus, setLocalStatus] = useState(""),
     [browserAccess, setBrowserAccess] = useState(""),
     [selectedId, setSelectedId] = useState(""),
     [selectedLine, setSelectedLine] = useState(""),
@@ -143,12 +149,30 @@ function App() {
     seekTarget = useRef<SeekTarget | null>(null),
     previewing = useRef<false | "seeking" | "playing">(false),
     token = useRef(crypto.randomUUID()),
+    localVideo = useRef<HTMLVideoElement>(null),
     timeline = useRef<HTMLDivElement>(null);
-  const send = (action: string, value?: number) =>
+  // Commands go to the local preview when one is showing, else to YouTube's embedded player.
+  const send = (action: string, value?: number) => {
+    const v = localVideo.current;
+    if (local && v) {
+      if (action === "seek" && typeof value === "number")
+        v.currentTime = Math.max(
+          0,
+          Math.min(v.duration || local.length, value - local.offset),
+        );
+      else if (action === "play") void v.play().catch(() => {});
+      else if (action === "pause") v.pause();
+      else if (action === "toggle") {
+        if (v.paused) void v.play().catch(() => {});
+        else v.pause();
+      }
+      return;
+    }
     iframe.current?.contentWindow?.postMessage(
       { token: token.current, action, value },
       origin,
     );
+  };
   const stopPreview = () => {
     send("pause");
     previewing.current = false;
@@ -201,6 +225,59 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = settings.appearance;
   }, [settings.appearance]);
+  const onPlayer = (type: string, value: any) => {
+    if (type === "time") {
+      if (
+        !acceptPlayerTime(
+          value,
+          seekTarget.current,
+          scrub.current?.kind === "playhead",
+          performance.now(),
+        )
+      )
+        return;
+      seekTarget.current = null;
+      setTime(value);
+      if (
+        previewing.current === "seeking" &&
+        value >= Math.max(0, start - padding) - 0.25 &&
+        value < Math.min(video?.duration ?? end, end + padding)
+      )
+        previewing.current = "playing";
+      if (
+        previewing.current === "playing" &&
+        value >= Math.min(video?.duration ?? end, end + padding)
+      ) {
+        send("pause");
+        previewing.current = false;
+        setPreviewActive(false);
+      }
+    }
+    if (
+      type === "state" &&
+      (value === 0 || (value === 2 && previewing.current === "playing"))
+    ) {
+      previewing.current = false;
+      setPreviewActive(false);
+    }
+    if (type === "state" && value === 1) setPlayerError("");
+    if (type === "ready") setReady(true);
+    if (type === "error") {
+      setReady(false);
+      previewing.current = false;
+      setPreviewActive(false);
+      setPlayerError(
+        value === 153
+          ? "YouTube rejected the player identity (error 153)."
+          : [101, 150].includes(value)
+            ? `YouTube’s embedded player won’t run here (error ${value}). That is usually a sign-in check, not a restriction by the video’s owner. A local preview is used instead.`
+            : `YouTube player error ${value}. A local preview is used instead.`,
+      );
+      if (!local && localStatus !== "loading") void loadLocalPreview();
+    }
+  };
+  const playerEvent = useRef(onPlayer);
+  playerEvent.current = onPlayer;
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (
@@ -209,59 +286,38 @@ function App() {
         e.data?.token !== token.current
       )
         return;
-      const { type, value } = e.data;
-      if (type === "time") {
-        if (
-          !acceptPlayerTime(
-            value,
-            seekTarget.current,
-            scrub.current?.kind === "playhead",
-            performance.now(),
-          )
-        )
-          return;
-        seekTarget.current = null;
-        setTime(value);
-        if (
-          previewing.current === "seeking" &&
-          value >= Math.max(0, start - padding) - 0.25 &&
-          value < Math.min(video?.duration ?? end, end + padding)
-        )
-          previewing.current = "playing";
-        if (
-          previewing.current === "playing" &&
-          value >= Math.min(video?.duration ?? end, end + padding)
-        ) {
-          send("pause");
-          previewing.current = false;
-          setPreviewActive(false);
-        }
-      }
-      if (
-        type === "state" &&
-        (value === 0 || (value === 2 && previewing.current === "playing"))
-      ) {
-        previewing.current = false;
-        setPreviewActive(false);
-      }
-      if (type === "state" && value === 1) setPlayerError("");
-      if (type === "ready") setReady(true);
-      if (type === "error") {
-        setReady(false);
-        previewing.current = false;
-        setPreviewActive(false);
-        setPlayerError(
-          value === 153
-            ? "YouTube rejected the player identity (error 153). Try reopening the app; this WebView may not send the required Referer."
-            : [101, 150].includes(value)
-              ? "The owner does not allow this video to be embedded. Downloads may still be available."
-              : `YouTube player error ${value}. Check video availability and network access.`,
-        );
-      }
+      playerEvent.current(e.data.type, e.data.value);
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [origin, start, end, padding, video]);
+  }, [origin]);
+  // A local preview reports its position like the embedded player does.
+  useEffect(() => {
+    if (!local) return;
+    const timer = window.setInterval(() => {
+      const v = localVideo.current;
+      if (v && !v.paused) playerEvent.current("time", local.offset + v.currentTime);
+    }, 80);
+    return () => window.clearInterval(timer);
+  }, [local]);
+  // Cuts a small low-resolution copy around the selection and plays it here instead.
+  const loadLocalPreview = async () => {
+    if (!video || !isTauri()) return;
+    const id = video.id;
+    const a = Math.max(0, start - padding - 30);
+    const b = Math.min(video.duration, a + 179, end + padding + 30);
+    setLocalStatus("loading");
+    try {
+      const path = await invoke<string>("make_preview", { id, start: a, end: b });
+      if (candidateRef.current !== id) return;
+      setReady(false);
+      setLocal({ url: convertFileSrc(path), offset: a, length: b - a });
+      setLocalStatus("");
+      setPlayerError("");
+    } catch (e) {
+      if (candidateRef.current === id) setLocalStatus(`error:${String(e)}`);
+    }
+  };
   const setIn = () => setStart(Math.max(0, Math.min(time, end - 0.01)));
   const setOut = () =>
     setEnd(Math.min(video?.duration ?? end, Math.max(time, start + 0.01)));
@@ -396,6 +452,8 @@ function App() {
     playerStart.current = Math.max(0, first.start - 2);
     captionCues.current = r.track.cues;
     setPickerOpen(false);
+    setLocal(null);
+    setLocalStatus("");
     setSelectedId(r.video.id);
     setCandidate(r.video.id);
     setSelectedLine(r.line);
@@ -750,7 +808,29 @@ function App() {
             </p>
           )}
           <div className="player">
-            {candidate && origin ? (
+            {local ? (
+              <video
+                key={local.url}
+                ref={localVideo}
+                src={local.url}
+                controls
+                playsInline
+                onLoadedMetadata={(e) => {
+                  const v = e.currentTarget;
+                  v.currentTime = Math.max(
+                    0,
+                    Math.min(v.duration || 0, playerStart.current - local.offset),
+                  );
+                  playerEvent.current("ready", true);
+                }}
+                onPlay={() => playerEvent.current("state", 1)}
+                onPause={() => playerEvent.current("state", 2)}
+                onEnded={() => playerEvent.current("state", 0)}
+                onError={() =>
+                  setLocalStatus("error:The preview file could not be played.")
+                }
+              />
+            ) : candidate && origin ? (
               <iframe
                 ref={iframe}
                 key={candidate}
@@ -768,6 +848,32 @@ function App() {
               </div>
             )}
           </div>
+          {localStatus === "loading" && (
+            <p className="metadata-status" role="status">
+              <span className="analyze-spinner" aria-hidden="true" />
+              Preparing a local preview…
+            </p>
+          )}
+          {localStatus.startsWith("error:") && (
+            <div className="notice error">
+              {localStatus.slice(6)}{" "}
+              <button onClick={() => void loadLocalPreview()}>Try again</button>
+            </div>
+          )}
+          {local && (
+            <p className="metadata-status">
+              Local preview of {timestamp(local.offset)} –{" "}
+              {timestamp(local.offset + local.length)}. Move In and Out inside
+              it, or{" "}
+              <button
+                className="inline-action"
+                onClick={() => void loadLocalPreview()}
+              >
+                reload around your selection
+              </button>
+              .
+            </p>
+          )}
           {candidate && (
             <div className="external-video-actions">
               <button
@@ -781,6 +887,11 @@ function App() {
               >
                 Open in YouTube ↗
               </button>
+              {!local && localStatus !== "loading" && (
+                <button onClick={() => void loadLocalPreview()}>
+                  Local preview
+                </button>
+              )}
               <button
                 onClick={() =>
                   act(() =>

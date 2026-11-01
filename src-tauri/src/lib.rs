@@ -7,6 +7,7 @@ mod grant_helper;
 mod model;
 mod network;
 mod platform;
+mod preview;
 mod player;
 mod metadata;
 mod session;
@@ -247,6 +248,33 @@ async fn list_channel(
     tauri::async_runtime::spawn_blocking(move || channel::list(settings, &channel, from, count))
         .await
         .map_err(|_| "Channel worker stopped".to_string())?
+}
+#[tauri::command]
+async fn make_preview(
+    app: tauri::AppHandle,
+    id: String,
+    start: f64,
+    end: f64,
+    s: State<'_, Backend>,
+) -> Result<String, String> {
+    let settings = s.settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let settings = session::prepare(&app, settings)?;
+    let saved = s.metadata.get(&id);
+    let dir = if platform::portable() {
+        platform::data_dir()?.join("Cache")
+    } else {
+        app.path()
+            .app_cache_dir()
+            .map_err(|_| "Cannot locate the preview folder")?
+    }
+    .join("previews");
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        preview::make(&handle, settings, saved, &id, start, end, dir)
+            .map(|p| p.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|_| "Preview worker stopped".to_string())?
 }
 #[tauri::command]
 fn player_origin(s: State<Backend>) -> String {
@@ -1206,6 +1234,7 @@ pub fn run() {
             pick_folder,
             pick_cookies,
             player_origin,
+            make_preview,
             analyze,
             list_channel,
             caption_track,
