@@ -1,4 +1,6 @@
 {
+  "productName": "Caption Finder Dev",
+  "identifier": "com.mike.captionfinder.dev",
   "bundle": {
     "externalBin": [
       "binaries/ffmpeg",
