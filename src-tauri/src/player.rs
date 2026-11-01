@@ -14,12 +14,10 @@ pub fn start() -> Result<String, String> {
             let req = String::from_utf8_lossy(&buf[..n]);
             let (status, body) = if req.starts_with("GET /player?") {
                 ("200 OK", include_str!("player.html"))
-            } else if req.starts_with("GET /youglish.html?") {
-                ("200 OK", include_str!("youglish.html"))
             } else {
                 ("404 Not Found", "Not found")
             };
-            let _=write!(socket,"HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nReferrer-Policy: strict-origin-when-cross-origin\r\nContent-Security-Policy: default-src 'none'; script-src 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://youglish.com; frame-src https://www.youtube.com https://youglish.com; connect-src https://youglish.com; img-src https: data:; style-src 'unsafe-inline';\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len());
+            let _=write!(socket,"HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nReferrer-Policy: strict-origin-when-cross-origin\r\nContent-Security-Policy: default-src 'none'; script-src 'unsafe-inline' https://www.youtube.com https://s.ytimg.com ; frame-src https://www.youtube.com; img-src https: data:; style-src 'unsafe-inline';\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len());
         }
     });
     Ok(origin)

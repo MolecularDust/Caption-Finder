@@ -1,0 +1,173 @@
+use crate::{base, model::Settings, platform, safe_error};
+use serde_json::{json, Value};
+use std::process::Stdio;
+
+/// Channel list address for a link, an @handle, or a bare channel id.
+pub fn channel_url(input: &str) -> Result<String, String> {
+    let text = input.trim();
+    if text.is_empty() {
+        return Err("Enter a channel link or @handle".into());
+    }
+    let tabs = [
+        "videos",
+        "featured",
+        "streams",
+        "shorts",
+        "playlists",
+        "community",
+        "about",
+    ];
+    if text.starts_with("http://") || text.starts_with("https://") {
+        let url = url::Url::parse(text).map_err(|_| "That is not a valid link")?;
+        let host = url.host_str().unwrap_or("");
+        if !["youtube.com", "www.youtube.com", "m.youtube.com"].contains(&host)
+            || url.username() != ""
+            || url.password().is_some()
+            || url.port().is_some()
+        {
+            return Err("Use a youtube.com channel link".into());
+        }
+        let mut segments = url
+            .path_segments()
+            .map(|s| s.filter(|p| !p.is_empty()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        if segments.last().is_some_and(|l| tabs.contains(l)) {
+            segments.pop();
+        }
+        let channel = match segments.as_slice() {
+            [handle] if handle.starts_with('@') => handle.to_string(),
+            ["channel", id] | ["c", id] | ["user", id] => format!("{}/{id}", segments[0]),
+            _ => return Err("That link is not a channel. Use a channel link or @handle.".into()),
+        };
+        return Ok(format!("https://www.youtube.com/{channel}/videos"));
+    }
+    let valid = |s: &str| {
+        !s.is_empty()
+            && s.len() <= 100
+            && s.chars()
+                .all(|c| c.is_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    };
+    if text.len() == 24 && text.starts_with("UC") && valid(text) {
+        return Ok(format!("https://www.youtube.com/channel/{text}/videos"));
+    }
+    let handle = text.trim_start_matches('@');
+    if valid(handle) {
+        return Ok(format!("https://www.youtube.com/@{handle}/videos"));
+    }
+    Err("Use a channel link or an @handle, for example @TED".into())
+}
+
+/// One page of a channel's videos, newest first. Entries are 1-based and inclusive.
+pub fn list(settings: Settings, channel: &str, from: u32, count: u32) -> Result<Vec<Value>, String> {
+    let url = channel_url(channel)?;
+    if from == 0 || count == 0 || count > 100 {
+        return Err("Invalid page request".into());
+    }
+    let range = format!("{from}-{}", from + count - 1);
+    let mut c = base(&settings)?;
+    // Later options win, so this page is fetched without the per-request pause that
+    // spaces out caption and download requests.
+    c.args([
+        "--yes-playlist",
+        "--flat-playlist",
+        "--dump-json",
+        "--sleep-requests",
+        "0",
+        "--playlist-items",
+        &range,
+        "--",
+        &url,
+    ])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+    let o = platform::output(&mut c).map_err(|_| "Cannot start yt-dlp")?;
+    let stderr = String::from_utf8_lossy(&o.stderr).into_owned();
+    crate::diagnostics::log(
+        crate::diagnostics::Stage::ChannelList,
+        &settings,
+        o.status.code(),
+        &stderr,
+    );
+    let entries = String::from_utf8_lossy(&o.stdout)
+        .lines()
+        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+        .filter_map(|v| {
+            let id = v["id"].as_str()?;
+            (id.len() == 11).then(|| {
+                json!({
+                    "id": id,
+                    "title": v["title"],
+                    "duration": v["duration"],
+                    "thumbnail": format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg"),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    if entries.is_empty() && from == 1 {
+        let lower = stderr.to_lowercase();
+        return Err(if lower.contains("404") || lower.contains("does not exist") {
+            "Couldn’t find that channel. Check the link or @handle.".into()
+        } else {
+            let message = safe_error(&stderr);
+            // Debug builds also show yt-dlp's last line to make setup problems diagnosable.
+            if cfg!(debug_assertions) {
+                let last = stderr.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("");
+                format!("{message} [debug: {}]", last.chars().take(240).collect::<String>())
+            } else {
+                message
+            }
+        });
+    }
+    Ok(entries)
+}
+
+#[cfg(test)]
+mod network_tests {
+    use super::*;
+    #[test]
+    #[ignore = "Requires network access and yt-dlp"]
+    fn lists_a_public_channel_page_by_page() {
+        let first = list(Settings::default(), "@TED", 1, 3).unwrap();
+        assert_eq!(first.len(), 3);
+        assert!(first.iter().all(|v| v["id"].as_str().unwrap().len() == 11));
+        let second = list(Settings::default(), "@TED", 4, 2).unwrap();
+        assert_eq!(second.len(), 2);
+        assert_ne!(first[0]["id"], second[0]["id"]);
+    }
+    #[test]
+    #[ignore = "Requires network access and yt-dlp"]
+    fn unknown_channel_gives_a_clear_error() {
+        let err = list(Settings::default(), "@this-channel-does-not-exist-zzqq", 1, 3).unwrap_err();
+        assert!(!err.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn accepts_links_handles_and_ids() {
+        let want = "https://www.youtube.com/@TED/videos";
+        assert_eq!(channel_url("@TED").unwrap(), want);
+        assert_eq!(channel_url("TED").unwrap(), want);
+        assert_eq!(channel_url("https://www.youtube.com/@TED").unwrap(), want);
+        assert_eq!(channel_url("https://youtube.com/@TED/featured/").unwrap(), want);
+        assert_eq!(
+            channel_url("https://www.youtube.com/channel/UC1234567890123456789012").unwrap(),
+            "https://www.youtube.com/channel/UC1234567890123456789012/videos"
+        );
+        assert_eq!(
+            channel_url("UC1234567890123456789012").unwrap(),
+            "https://www.youtube.com/channel/UC1234567890123456789012/videos"
+        );
+    }
+    #[test]
+    fn rejects_other_hosts_videos_and_junk() {
+        assert!(channel_url("").is_err());
+        assert!(channel_url("https://example.com/@TED").is_err());
+        assert!(channel_url("https://evil.test/https://youtube.com/@TED").is_err());
+        assert!(channel_url("https://www.youtube.com/watch?v=abcdefghijk").is_err());
+        assert!(channel_url("two words").is_err());
+        assert!(channel_url("@a/../b").is_err());
+    }
+}

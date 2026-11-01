@@ -13,6 +13,7 @@ pub enum Stage {
     QueueRejected,
     Invocation,
     Analysis,
+    ChannelList,
     CaptionMetadata,
     Captions,
     Download,

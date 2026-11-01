@@ -24,96 +24,42 @@ import {
 } from "./domain";
 import {
   findSubtitleMatches,
-  cleanWidgetCaption,
   defaultHeight,
   type Match,
   type CaptionTrack,
 } from "./subtitles";
+import {
+  searchChannel,
+  type ChannelEntry,
+  type SearchEnd,
+  type SearchResult,
+} from "./search";
+import { ResultsList, Highlight } from "./results";
 import "./style.css";
 import appIcon from "./assets/app-icon.png";
-const languageCodes: Record<string, string> = {
-  english: "en",
-  french: "fr",
-  german: "de",
-  spanish: "es",
-  italian: "it",
-  portuguese: "pt",
-  russian: "ru",
-  turkish: "tr",
-  dutch: "nl",
-  arabic: "ar",
-  chinese: "zh",
-  japanese: "ja",
-  korean: "ko",
-  greek: "el",
-  hebrew: "he",
-  hindi: "hi",
-  indonesian: "id",
-  polish: "pl",
-  romanian: "ro",
-  swedish: "sv",
-  thai: "th",
-  ukrainian: "uk",
-  vietnamese: "vi",
+const CAPTION_LANGUAGE = "en";
+const RESULT_SLOTS = 25;
+type SearchStatus = {
+  state: "idle" | "running" | "done" | "error";
+  scanned: number;
+  found: number;
+  reason?: SearchEnd;
+  message?: string;
 };
-const accents: Record<string, string[][]> = {
-  arabic: [
-    ["sa", "Saudi Arabia"],
-    ["eg", "Egypt"],
-    ["dz", "Algeria"],
-    ["ma", "Morocco"],
-    ["tn", "Tunisia"],
-    ["lb", "Lebanon"],
-    ["sy", "Syria"],
-    ["jo", "Jordan"],
-    ["iq", "Iraq"],
-    ["qa", "Qatar"],
-    ["ae", "UAE"],
-    ["kw", "Kuwait"],
-    ["bh", "Bahrain"],
-    ["om", "Oman"],
-    ["af", "Afghanistan"],
-    ["ps", "Palestine"],
-    ["il", "Israel"],
-    ["ly", "Libya"],
-  ],
-  english: [
-    ["us", "US"],
-    ["uk", "UK"],
-    ["aus", "Australia"],
-    ["ca", "Canada"],
-    ["ie", "Ireland"],
-    ["sco", "Scotland"],
-    ["nz", "New Zealand"],
-  ],
-  french: [
-    ["fr", "France"],
-    ["qc", "Quebec"],
-    ["be", "Belgium"],
-    ["ch", "Switzerland"],
-  ],
-  spanish: [
-    ["es", "Spain"],
-    ["la", "Latin America"],
-  ],
-  portuguese: [
-    ["pt", "Portugal"],
-    ["br", "Brazil"],
-  ],
-  dutch: [
-    ["nl", "Netherlands"],
-    ["be", "Belgium"],
-  ],
-  chinese: [
-    ["cn", "China"],
-    ["tw", "Taiwan"],
-    ["sg", "Singapore"],
-    ["hk", "Hong Kong"],
-    ["sh", "Shanghai"],
-    ["mo", "Macao"],
-    ["mn", "Mongolia"],
-  ],
-};
+function searchStatusText(s: SearchStatus): string {
+  if (s.state === "running")
+    return `Searching… checked ${s.scanned} videos, ${s.found} with matches`;
+  if (s.state === "error") return s.message ?? "The search failed.";
+  if (s.state !== "done") return "Enter a channel and a phrase, then search.";
+  if (s.reason === "blocked") return s.message ?? "The search was stopped.";
+  if (!s.found)
+    return `No matches in ${s.scanned} videos. Try a shorter phrase.`;
+  const found = `${s.found} ${s.found === 1 ? "video" : "videos"}, newest first`;
+  if (s.reason === "exhausted")
+    return `${found} · checked all ${s.scanned} videos`;
+  if (s.reason === "cap") return `${found} · stopped after ${s.scanned} videos`;
+  return `${found} · checked ${s.scanned}`;
+}
 const defaults: Settings = {
   destination: "",
   browser: "",
@@ -124,15 +70,17 @@ function App() {
   const [settings, setSettings] = useState<Settings>(defaults),
     [showSettings, setShowSettings] = useState(false),
     [browsers, setBrowsers] = useState<string[]>([]),
-    [phrase, setPhrase] = useState(""),
-    [language, setLanguage] = useState("english"),
-    [accent, setAccent] = useState(""),
-    [search, setSearch] = useState<{
-      phrase: string;
-      language: string;
-      accent: string;
-      run: number;
-    } | null>(null),
+    [channel, setChannel] = useState(() => localStorage.getItem("cf.channel") ?? ""),
+    [phrase, setPhrase] = useState(() => localStorage.getItem("cf.phrase") ?? ""),
+    [results, setResults] = useState<SearchResult[]>([]),
+    [searchedPhrase, setSearchedPhrase] = useState(""),
+    [searchStatus, setSearchStatus] = useState<SearchStatus>({
+      state: "idle",
+      scanned: 0,
+      found: 0,
+    }),
+    [selectedId, setSelectedId] = useState(""),
+    [selectedLine, setSelectedLine] = useState(""),
     [candidate, setCandidate] = useState(""),
     [matches, setMatches] = useState<Match[]>([]),
     [matchChosen, setMatchChosen] = useState(false),
@@ -152,7 +100,6 @@ function App() {
     [ready, setReady] = useState(false),
     [previewActive, setPreviewActive] = useState(false),
     [previewMode, setPreviewMode] = useState(false),
-    [widgetHeight, setWidgetHeight] = useState(660),
     [lengthValid, setLengthValid] = useState(true),
     [inValid, setInValid] = useState(true),
     [outValid, setOutValid] = useState(true),
@@ -174,7 +121,7 @@ function App() {
     [jobs, setJobs] = useState<Job[]>([]);
   const candidateRef = useRef(""),
     dirtyName = useRef(false),
-    captureCaption = useRef(false),
+    searchAbort = useRef<AbortController | null>(null),
     matchRequest = useRef(0);
   const selectionGeneration = useRef(0);
   const captionCache = useRef(
@@ -255,87 +202,6 @@ function App() {
       )
         return;
       const { type, value } = e.data;
-      if (
-        type === "height" &&
-        typeof value === "number" &&
-        Number.isFinite(value) &&
-        value > 0
-      ) {
-        setWidgetHeight(Math.ceil(value));
-        return;
-      }
-      if (
-        type === "video" &&
-        typeof value === "string" &&
-        /^[\w-]{11}$/.test(value)
-      ) {
-        candidateRef.current = value;
-        matchRequest.current++;
-        dirtyName.current = false;
-        captureCaption.current = true;
-        setCandidate(value);
-        setPlayerError("");
-        setPreviewMode(false);
-        setVideo(null);
-        setMatches([]);
-        setFileName("");
-        setFileNameEdited(false);
-        setMatchStatus(
-          "Choose your example, then click Look Up to load its timings.",
-        );
-        setStart(0);
-        setEnd(0);
-        setTime(0);
-        setBusy(false);
-        setInValid(true);
-        setOutValid(true);
-        setLengthValid(true);
-        setResetVersion((n) => n + 1);
-        setPadding(2);
-        setMetadataLoading(false);
-        setMetadataStatus("");
-      }
-      if (
-        type === "caption" &&
-        typeof value === "string" &&
-        !dirtyName.current
-      ) {
-        if (captureCaption.current) {
-          const caption = cleanWidgetCaption(value);
-          if (caption) {
-            setFileName(caption);
-            captureCaption.current = false;
-          }
-        }
-        setFileNameEdited(true);
-      }
-      if (type === "fetch" && value === 0)
-        setMatchStatus("No YouGlish results found.");
-      if (type === "fetch" && value === -1) {
-        candidateRef.current = "";
-        matchRequest.current++;
-        setCandidate("");
-        setVideo(null);
-        setMatches([]);
-        selectionGeneration.current++;
-        setMetadataLoading(false);
-        setMetadataStatus("");
-        setBusy(false);
-        setStart(0);
-        setEnd(0);
-        setMatchStatus("Searching YouGlish…");
-      }
-      if (type === "preview") setPreviewMode(!!value);
-      if (type === "widget-error")
-        setPlayerError(
-          value === 1
-            ? "YouTube could not play this sample. Check the message in the player for details, or try the next result. The downloader’s cookies setting does not sign in this player."
-            : value === 2
-              ? "YouGlish reports that this browser is unsupported. Try the YouGlish website in your browser."
-              : value === 3
-                ? "YouGlish timed out. Check your connection and try searching again."
-                : `YouGlish reported an error (${value}). Try another sample or search again.`,
-        );
       if (type === "time") {
         if (
           !acceptPlayerTime(
@@ -425,6 +291,7 @@ function App() {
     setStart(Math.max(0, m.start));
     setEnd(Math.min(v.duration, m.end));
     setTime(m.start);
+    if (ready) send("seek", Math.max(0, m.start - padding));
     setMatchStatus(
       "Matched subtitle segment boundaries. Adjust In/Out as needed.",
     );
@@ -439,7 +306,7 @@ function App() {
         return;
       }
       const request = ++matchRequest.current;
-      const code = languageCodes[search?.language ?? language];
+      const code = CAPTION_LANGUAGE;
       const cacheKey = [id, code, settings.browser, settings.cookiesFile].join(
         "|",
       );
@@ -501,6 +368,127 @@ function App() {
         }
       }
     });
+  const playerStart = useRef(0);
+  const selectResult = (r: SearchResult) => {
+    const first = r.matches[0];
+    candidateRef.current = r.video.id;
+    matchRequest.current++;
+    selectionGeneration.current++;
+    dirtyName.current = false;
+    captionCache.current.set(
+      [r.video.id, CAPTION_LANGUAGE, settings.browser, settings.cookiesFile].join("|"),
+      { video: r.video, track: r.track },
+    );
+    playerStart.current = Math.max(0, first.start - 2);
+    setSelectedId(r.video.id);
+    setCandidate(r.video.id);
+    setSelectedLine(r.line);
+    setPlayerError("");
+    setReady(false);
+    setPreviewMode(true);
+    setPreviewActive(false);
+    previewing.current = false;
+    setBusy(false);
+    setMetadataLoading(false);
+    setMetadataStatus("");
+    setPadding(2);
+    setVideo(r.video);
+    setMatches(r.matches);
+    setResolution(defaultHeight(r.video.formats.map((f) => f.height ?? 0)));
+    setFileName(safeFileName(r.line).slice(0, 90));
+    setFileNameEdited(true);
+    selectMatch(first, r.video);
+  };
+  const runSearch = async () => {
+    const text = phrase.trim(),
+      source = channel.trim();
+    if (!text || !source) return;
+    if (!isTauri()) {
+      setSearchStatus({
+        state: "error",
+        scanned: 0,
+        found: 0,
+        message: "Open the desktop app to search a channel.",
+      });
+      return;
+    }
+    try {
+      localStorage.setItem("cf.channel", source);
+      localStorage.setItem("cf.phrase", text);
+    } catch {
+      /* remembering the last search is only a convenience */
+    }
+    searchAbort.current?.abort();
+    const control = new AbortController();
+    searchAbort.current = control;
+    matchRequest.current++;
+    candidateRef.current = "";
+    setResults([]);
+    setSelectedId("");
+    setCandidate("");
+    setVideo(null);
+    setMatches([]);
+    setSelectedLine("");
+    setFileName("");
+    setSearchedPhrase(text);
+    setSearchStatus({ state: "running", scanned: 0, found: 0 });
+    try {
+      const outcome = await searchChannel(
+        {
+          list: (from, count) =>
+            invoke<ChannelEntry[]>("list_channel", {
+              channel: source,
+              from,
+              count,
+            }),
+          captions: async (id) => {
+            const key = [id, CAPTION_LANGUAGE, settings.browser, settings.cookiesFile].join("|");
+            const cached = captionCache.current.get(key);
+            if (cached) return cached;
+            const found = await invoke<{ video: Video; track: CaptionTrack }>(
+              "caption_track",
+              {
+                url: `https://www.youtube.com/watch?v=${id}`,
+                language: CAPTION_LANGUAGE,
+              },
+            );
+            captionCache.current.set(key, found);
+            return found;
+          },
+        },
+        text,
+        {
+          limit: RESULT_SLOTS,
+          batch: 30,
+          cap: 400,
+          concurrency: 3,
+          signal: control.signal,
+          onResult: (r) =>
+            setResults((old) => [...old, r].sort((a, b) => a.order - b.order)),
+          onProgress: (scanned, found) =>
+            setSearchStatus((old) => ({ ...old, scanned, found })),
+        },
+      );
+      if (searchAbort.current === control)
+        setSearchStatus({
+          state: outcome.reason === "blocked" ? "error" : "done",
+          scanned: outcome.scanned,
+          found: outcome.found,
+          reason: outcome.reason,
+          message: outcome.error,
+        });
+    } catch (e) {
+      if (searchAbort.current === control)
+        setSearchStatus((old) => ({ ...old, state: "error", message: String(e) }));
+    }
+  };
+  const cancelSearch = () => {
+    searchAbort.current?.abort();
+    setSearchStatus((old) => ({ ...old, state: "done", reason: "cancelled" }));
+  };
+  useEffect(() => {
+    if (!candidate && results.length === 1) selectResult(results[0]);
+  }, [results]);
   const formats =
     video?.formats.filter((f) => f.height && f.vcodec !== "none") ?? [];
   const heights = [...new Set(formats.map((f) => f.height!))].sort(
@@ -586,105 +574,127 @@ function App() {
         <div className="brand">
           <img className="app-icon" src={appIcon} alt="" />
           <div>
-            <strong>YouGlish Downloader</strong>
-            <small>Find a voice. Keep the moment.</small>
+            <strong>Caption Finder</strong>
+            <small>Find the line. Keep the moment.</small>
           </div>
         </div>
-        <button onClick={() => setShowSettings(true)}>
-          ◎ <span>Account & Settings</span>
-        </button>
-      </header>
-      <main>
-        <div className="intro">
-          <div>
-            <p className="eyebrow">YOUR NEXT SPEECH EXAMPLE</p>
-            <h1>Find something worth hearing.</h1>
-          </div>
+        <div className="header-actions">
           <span className="badge">
             ●{" "}
             {settings.browser || settings.cookiesFile
-              ? settings.browser === "app" ? "App session" : "Browser session"
+              ? settings.browser === "app"
+                ? "App session"
+                : "Browser session"
               : "Anonymous"}
           </span>
+          <button onClick={() => setShowSettings(true)}>
+            ◎ <span>Account & Settings</span>
+          </button>
         </div>
+      </header>
+      <main>
         <section className="url-card">
-          <label htmlFor="phrase">Search phrase</label>
           <form
             className="search-row"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!phrase.trim()) return;
-              candidateRef.current = "";
-              matchRequest.current++;
-              setCandidate("");
-              setVideo(null);
-              setMatches([]);
-              setFileName("");
-              setBusy(false);
-              selectionGeneration.current++;
-              setMetadataLoading(false);
-              setMetadataStatus("");
-              setSearch({
-                phrase: phrase.trim(),
-                language,
-                accent,
-                run: Date.now(),
-              });
+              if (searchStatus.state !== "running") void runSearch();
             }}
           >
-            <input
-              id="phrase"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              value={phrase}
-              onChange={(e) => setPhrase(e.target.value)}
-              placeholder="Enter a word or phrase"
-              required
-            />
-            <select
-              aria-label="Language"
-              value={language}
-              onChange={(e) => {
-                setLanguage(e.target.value);
-                setAccent("");
-              }}
-            >
-              {Object.keys(languageCodes).map((l) => (
-                <option key={l} value={l}>
-                  {l[0].toUpperCase() + l.slice(1)}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Accent"
-              value={accent}
-              onChange={(e) => setAccent(e.target.value)}
-            >
-              <option value="">All accents</option>
-              {(accents[language] ?? []).map(([code, name]) => (
-                <option key={code} value={code}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <button className="primary" type="submit">
-              Search →
-            </button>
+            <label className="field" htmlFor="channel">
+              <span>YouTube channel</span>
+              <input
+                id="channel"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                placeholder="Channel link or @handle"
+                required
+              />
+            </label>
+            <div className="phrase-group">
+              <label className="field" htmlFor="phrase">
+                <span>Search phrase</span>
+                <input
+                  id="phrase"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={phrase}
+                  onChange={(e) => setPhrase(e.target.value)}
+                  placeholder="Enter a word or phrase"
+                  required
+                />
+              </label>
+              {searchStatus.state === "running" ? (
+                <button
+                  className="search-button"
+                  type="button"
+                  onClick={cancelSearch}
+                >
+                  Stop
+                </button>
+              ) : (
+                <button className="primary search-button" type="submit">
+                  Search →
+                </button>
+              )}
+            </div>
           </form>
-
         </section>
-        <section className="video-card">
+        <div className="panes">
+          <section className="results-card" aria-label="Matching videos">
+            <div className="video-info">
+              <div>
+                <span className="eyebrow">RESULTS</span>
+                <h2>
+                  {results.length
+                    ? `${results.length} ${results.length === 1 ? "video" : "videos"} with “${searchedPhrase}”`
+                    : "Matching videos"}
+                </h2>
+                <p
+                  className={
+                    searchStatus.state === "error" ? "status error" : "status"
+                  }
+                  role="status"
+                >
+                  {searchStatusText(searchStatus)}{" "}
+                  {/denied access|cookies/i.test(searchStatus.message ?? "") && (
+                    <button
+                      type="button"
+                      className="inline-action"
+                      onClick={() => setShowSettings(true)}
+                    >
+                      Open Account & Settings
+                    </button>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="results-scroll">
+              <ResultsList
+                results={results}
+                slots={RESULT_SLOTS}
+                searching={searchStatus.state === "running"}
+                phrase={searchedPhrase}
+                selectedId={selectedId}
+                onSelect={selectResult}
+              />
+            </div>
+          </section>
+          <section className="video-card">
           <div className="video-info">
             <div>
-              <span className="eyebrow">YOUGLISH</span>
+              <span className="eyebrow">VIDEO</span>
               <h2>
-                {video?.title ?? "Listen, watch, and choose your example."}
+                {video?.title ?? "Watch, adjust, and keep your example."}
               </h2>
               <p>
                 {video
                   ? `${video.channel} · ${timestamp(video.duration)}`
-                  : "Browse YouGlish, choose an example, then click Look Up."}
+                  : "Select a search result to load its video."}
               </p>
             </div>
           </div>
@@ -696,22 +706,22 @@ function App() {
               {metadataStatus}
             </p>
           )}
-          <div className="youglish-player">
-            {search && origin ? (
+          <div className="player">
+            {candidate && origin ? (
               <iframe
                 ref={iframe}
-                key={search.run}
-                title="YouGlish pronunciation search"
-                style={{ height: widgetHeight }}
-                src={`${origin}/youglish.html?token=${token.current}&query=${encodeURIComponent(search.phrase)}&lang=${encodeURIComponent(search.language)}&accent=${encodeURIComponent(search.accent)}`}
+                key={candidate}
+                title="YouTube player"
+                src={`${origin}/player?token=${token.current}&id=${candidate}&start=${playerStart.current.toFixed(2)}`}
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             ) : (
               <div className="empty-player">
-                <h3>Your next example starts here</h3>
-                <p>Enter a phrase and search YouGlish.</p>
+                <div className="play-symbol">▶</div>
+                <h3>Your video appears here</h3>
+                <p>Search a channel, then select a result.</p>
               </div>
             )}
           </div>
@@ -742,6 +752,18 @@ function App() {
             </div>
           )}
           {playerError && <div className="notice error">{playerError}</div>}
+          <div className="matched-line">
+            <span className="label">Matched line</span>
+            <p>
+              {selectedLine ? (
+                <>
+                  … <Highlight line={selectedLine} phrase={searchedPhrase} /> …
+                </>
+              ) : (
+                "The caption line containing your phrase shows here."
+              )}
+            </p>
+          </div>
           <div className="trim">
             <fieldset className="trim-details" disabled={!candidate}>
               <fieldset className="clip-controls" disabled={!video || busy}>
@@ -1061,7 +1083,7 @@ function App() {
                         matchFilename();
                       }
                     }}
-                    placeholder="Choose a YouGlish sample, then enter a sentence from its subtitles"
+                    placeholder="Select a result, or type a sentence from its subtitles"
                   />
                   <span>.{container}</span>
                   <button
@@ -1123,12 +1145,14 @@ function App() {
             </fieldset>
             {!video && (
               <small className="trim-hint">
-                Click Look Up when you have chosen your example. Padding extends
-                both ends, stopping at the beginning and end of the video.
+                Select a search result to set In and Out from its caption line.
+                Padding extends both ends, stopping at the beginning and end of
+                the video.
               </small>
             )}
           </div>
         </section>
+        </div>
         <section className="settings-card">
           <details>
             <summary>
@@ -1412,7 +1436,7 @@ function App() {
               <h2>Account & Settings</h2>
               <button onClick={() => setShowSettings(false)}>Done</button>
             </div>
-            <h3>YouGlish playback account</h3>
+            <h3>Video player account</h3>
             <p>Sign in to Google first, then connect YouTube and select your channel if asked. Close the account window when finished and search again to reload the player.</p>
             <div className="playback-test-actions">
               <button onClick={() => act(() => invoke("youtube_sign_in_window"))}>1. Sign in to Google ↗</button>
@@ -1475,8 +1499,9 @@ function App() {
               analyze or download. Your operating system may request browser cookie-store
 
               access. Cookies are never printed or copied into app settings, or
-              injected into YouGlish. This setting controls subtitle retrieval
-              and downloads; the widget uses its own WebView session.
+              injected into the video player. This setting controls caption
+              retrieval and downloads; the player uses the app’s own sign-in
+              above.
             </p>
             <Field label="Appearance">
               <select

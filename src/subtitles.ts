@@ -89,3 +89,14 @@ export function cleanWidgetCaption(value: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** The caption text spoken during a match, for showing it in context. */
+export function matchLine(cues: Cue[], m: Match): string {
+  const text = cues
+    .filter((c) => c.end > m.start && c.start < m.end)
+    .map((c) => c.text)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 220 ? `${text.slice(0, 217)}…` : text;
+}

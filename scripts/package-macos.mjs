@@ -26,7 +26,7 @@ run(process.execPath, [
   "--config",
   "src-tauri/tauri.bundle.conf.json",
 ]);
-const app = resolve("src-tauri/target/release/bundle/macos/YouGlish Downloader.app");
+const app = resolve("src-tauri/target/release/bundle/macos/Caption Finder.app");
 const binaries = join(app, "Contents/MacOS");
 // Approved by the user on 2026-10-20. Never apply this entitlement to the main app.
 run("codesign", [
@@ -43,7 +43,7 @@ run("codesign", [
 run("codesign", ["--force", "--options", "runtime", "--sign", "-", app]);
 run("codesign", ["--verify", "--deep", "--strict", app]);
 for (const name of [
-  "video-downloader",
+  "caption-finder",
   "yt-dlp",
   "ffmpeg",
   "ffprobe",
@@ -88,7 +88,7 @@ mkdirSync(".tools", { recursive: true });
 const temporary = mkdtempSync(resolve(".tools/package-"));
 const staging = join(temporary, "image");
 mkdirSync(staging);
-cpSync(app, join(staging, "YouGlish Downloader.app"), {
+cpSync(app, join(staging, "Caption Finder.app"), {
   recursive: true,
   verbatimSymlinks: true,
 });
@@ -96,14 +96,14 @@ run("codesign", [
   "--verify",
   "--deep",
   "--strict",
-  join(staging, "YouGlish Downloader.app"),
+  join(staging, "Caption Finder.app"),
 ]);
 symlinkSync("/Applications", join(staging, "Applications"));
-const image = join(temporary, "YouGlish Downloader_0.1.0_aarch64.dmg");
+const image = join(temporary, "Caption Finder_0.1.0_aarch64.dmg");
 run("hdiutil", [
   "create",
   "-volname",
-  "TubeCutter",
+  "Caption Finder",
   "-srcfolder",
   staging,
   "-format",
@@ -113,7 +113,7 @@ run("hdiutil", [
 run("hdiutil", ["verify", image]);
 const destination = resolve("src-tauri/target/release/bundle/dmg");
 mkdirSync(destination, { recursive: true });
-const finalImage = join(destination, "YouGlish Downloader_0.1.0_aarch64.dmg");
+const finalImage = join(destination, "Caption Finder_0.1.0_aarch64.dmg");
 renameSync(image, finalImage);
 const hashes = {
   target: "aarch64-apple-darwin",
@@ -122,11 +122,11 @@ const hashes = {
   deno: "JIT disabled",
   files: {},
 };
-for (const name of ["video-downloader", "yt-dlp", "ffmpeg", "ffprobe", "deno"])
+for (const name of ["caption-finder", "yt-dlp", "ffmpeg", "ffprobe", "deno"])
   hashes.files[name] = createHash("sha256")
     .update(readFileSync(join(binaries, name)))
     .digest("hex");
-hashes.files["YouGlish Downloader_0.1.0_aarch64.dmg"] = createHash("sha256")
+hashes.files["Caption Finder_0.1.0_aarch64.dmg"] = createHash("sha256")
   .update(readFileSync(finalImage))
   .digest("hex");
 writeFileSync(

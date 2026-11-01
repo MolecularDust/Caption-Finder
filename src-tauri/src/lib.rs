@@ -1,4 +1,5 @@
 mod captions;
+mod channel;
 mod diagnostics;
 mod download_files;
 mod model;
@@ -51,6 +52,11 @@ fn auth(c: &mut std::process::Command, s: &Settings) -> Result<(), String> {
     Ok(())
 }
 fn base(s: &Settings) -> Result<std::process::Command, String> {
+    base_with(s, true)
+}
+/// `js_runtime: false` skips the bundled JavaScript runtime. Only format URLs need it, and it
+/// runs in a slow interpreter mode, so caption scans leave it out.
+fn base_with(s: &Settings, js_runtime: bool) -> Result<std::process::Command, String> {
     let mut c = platform::command("yt-dlp")?;
     c.args([
         "--ignore-config",
@@ -73,8 +79,10 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
     if let Ok(p) = platform::binary("ffmpeg") {
         c.arg("--ffmpeg-location").arg(p.parent().unwrap());
     }
-    if let Ok(p) = platform::binary("deno") {
-        c.arg("--js-runtimes").arg(format!("deno:{}", p.display()));
+    if js_runtime {
+        if let Ok(p) = platform::binary("deno") {
+            c.arg("--js-runtimes").arg(format!("deno:{}", p.display()));
+        }
     }
     network::configure(&mut c);
     auth(&mut c, s)?;
@@ -170,6 +178,7 @@ async fn caption_track(
     app: tauri::AppHandle,
     url: String,
     language: String,
+    quick: Option<bool>,
     s: State<'_, Backend>,
 ) -> Result<serde_json::Value, String> {
     let settings = s.settings.lock().unwrap().clone();
@@ -183,9 +192,29 @@ async fn caption_track(
     }
     .join("captions");
 
-    tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, settings, cache))
+    tauri::async_runtime::spawn_blocking(move || {
+        if quick == Some(true) {
+            captions::retrieve_quick(url, language, settings, cache)
+        } else {
+            captions::retrieve(url, language, settings, cache)
+        }
+    })
         .await
         .map_err(|_| "Caption worker stopped".to_string())?
+}
+#[tauri::command]
+async fn list_channel(
+    app: tauri::AppHandle,
+    channel: String,
+    from: u32,
+    count: u32,
+    s: State<'_, Backend>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
+    tauri::async_runtime::spawn_blocking(move || channel::list(settings, &channel, from, count))
+        .await
+        .map_err(|_| "Channel worker stopped".to_string())?
 }
 #[tauri::command]
 fn player_origin(s: State<Backend>) -> String {
@@ -868,19 +897,6 @@ fn reveal(s: State<Backend>, id: String) -> Result<(), String> {
     return Err("Reveal is not implemented for this platform".into());
     Ok(())
 }
-/// Open the official site as the top-level document for a playback comparison.
-/// No IPC capabilities are granted to this remote-content window.
-#[tauri::command]
-fn test_youglish_window(
-    app: tauri::AppHandle,
-    phrase: String,
-    language: String,
-    accent: String,
-) -> Result<(), String> {
-    let url = youglish_test_url(&phrase, &language, &accent)?;
-    show_session_window(app, url)
-}
-
 /// Use the same persistent, non-incognito webview as the playback test.
 /// Authentication happens on Google's pages; no credentials are read by the app.
 #[tauri::command]
@@ -908,7 +924,7 @@ fn youtube_connect_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 fn show_session_window(app: tauri::AppHandle, url: url::Url) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("youglish-test") {
+    if let Some(window) = app.get_webview_window("account") {
         window
             .navigate(url)
             .map_err(|_| "Could not load session page")?;
@@ -919,8 +935,8 @@ fn show_session_window(app: tauri::AppHandle, url: url::Url) -> Result<(), Strin
     } else {
         // Default persistent website store is shared by app webviews. Remote
         // content has no Tauri IPC capability. Do not use an ephemeral profile.
-        tauri::WebviewWindowBuilder::new(&app, "youglish-test", tauri::WebviewUrl::External(url))
-            .title("YouGlish Downloader — YouTube account")
+        tauri::WebviewWindowBuilder::new(&app, "account", tauri::WebviewUrl::External(url))
+            .title("Caption Finder — YouTube account")
             .inner_size(1080., 900.)
             .build()
             .map_err(|_| "Could not open the account window")?;
@@ -928,42 +944,6 @@ fn show_session_window(app: tauri::AppHandle, url: url::Url) -> Result<(), Strin
     Ok(())
 }
 
-fn youglish_test_url(phrase: &str, language: &str, accent: &str) -> Result<url::Url, String> {
-    if phrase.trim().is_empty()
-        || phrase.len() > 1000
-        || language.is_empty()
-        || !language.bytes().all(|b| b.is_ascii_lowercase())
-        || !accent.bytes().all(|b| b.is_ascii_lowercase())
-    {
-        return Err("Enter a phrase and select a language and accent".into());
-    }
-    let mut url = url::Url::parse("https://youglish.com").unwrap();
-    url.path_segments_mut().unwrap().extend([
-        "pronounce",
-        phrase.trim(),
-        language,
-        if accent.is_empty() { "all" } else { accent },
-    ]);
-    Ok(url)
-}
-#[cfg(test)]
-mod youglish_window_tests {
-    use super::*;
-    #[test]
-    fn test_window_stays_on_official_host_and_encodes_query() {
-        let url = youglish_test_url("hello / café? # & world", "english", "us").unwrap();
-        assert_eq!(url.host_str(), Some("youglish.com"));
-        assert!(url.query().is_none());
-        assert!(url.fragment().is_none());
-        assert_eq!(url.path_segments().unwrap().count(), 4);
-        assert!(youglish_test_url("hello", "english/evil", "us").is_err());
-        assert!(youglish_test_url("", "english", "").is_err());
-        assert!(youglish_test_url("hi", "english", "")
-            .unwrap()
-            .path()
-            .ends_with("/all"));
-    }
-}
 #[tauri::command]
 fn open_youtube(url: String) -> Result<(), String> {
     let url = normalize(&url)?;
@@ -1067,7 +1047,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_clipboard,
             open_youtube,
-            test_youglish_window,
             youtube_sign_in_window,
             youtube_connect_window,
             youtube_playback_test,
@@ -1079,6 +1058,7 @@ pub fn run() {
             pick_cookies,
             player_origin,
             analyze,
+            list_channel,
             caption_track,
             enqueue,
             jobs,
@@ -1088,7 +1068,7 @@ pub fn run() {
             reveal
         ])
         .build(tauri::generate_context!())
-        .expect("Unable to start TubeCutter");
+        .expect("Unable to start Caption Finder");
     app.run(|app, event| {
         if let tauri::RunEvent::Exit = event {
             let s = app.state::<Backend>();

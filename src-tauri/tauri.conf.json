@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "YouGlish Downloader",
+  "productName": "Caption Finder",
   "version": "0.1.0",
-  "identifier": "com.mike.phoneticcutter",
+  "identifier": "com.mike.captionfinder",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1421",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "YouGlish Downloader",
+        "title": "Caption Finder",
         "width": 1080,
         "height": 900,
         "minWidth": 760,
@@ -30,7 +30,7 @@
       "dmg"
     ],
     "category": "public.app-category.video",
-    "shortDescription": "Download and trim authorized YouTube videos",
+    "shortDescription": "Find a phrase in a YouTube channel’s captions and keep the clip",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

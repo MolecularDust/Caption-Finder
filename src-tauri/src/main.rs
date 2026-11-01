@@ -1,4 +1,4 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 fn main() {
-    video_downloader_lib::run();
+    caption_finder_lib::run();
 }
