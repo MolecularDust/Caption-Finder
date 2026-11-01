@@ -1,1 +1,1 @@
-{"identifier":"main","windows":["main","grant-helper"],"permissions":["core:default","drag:default"]}
+{"identifier":"main","windows":["main","grant-helper"],"permissions":["core:default","drag:default","core:window:allow-start-dragging"]}

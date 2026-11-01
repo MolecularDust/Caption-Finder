@@ -19,14 +19,23 @@ export default function GrantHelper() {
     e.preventDefault();
     if (!bundle) return;
     setError("");
-    startDrag({
-      item: [bundle],
-      icon: appIcon.replace(/^data:image\/\w+;base64,/, ""),
-    }).catch((err) => setError(String(err)));
+    // The plugin wants the icon as a full "data:image/png;base64,…" string, prefix included.
+    startDrag({ item: [bundle], icon: appIcon }).catch((err) =>
+      setError(String(err)),
+    );
   };
   return (
     <div className="helper">
-      <strong>Turn on Caption Finder in the Full Disk Access list</strong>
+      <div className="helper-bar" data-tauri-drag-region>
+        <button
+          className="helper-close"
+          aria-label="Close"
+          onClick={() => void invoke("close_grant_helper")}
+        >
+          ✕
+        </button>
+      </div>
+      <strong>Turn on Caption Finder in this list</strong>
       {bundle === null ? (
         <p>
           This copy isn’t a packaged app, so it can’t be added. Open the
@@ -46,10 +55,13 @@ export default function GrantHelper() {
             Not in the list? Drag this icon into it, then switch it on. When
             macOS asks, choose <em>Quit &amp; Reopen</em>.
           </p>
+          <p>
+            Already listed but still blocked? That entry belongs to an older
+            build: select it, press − under the list, then drag this icon in.
+          </p>
         </>
       )}
       {error && <p className="helper-error">{error}</p>}
-      <button onClick={() => void invoke("close_grant_helper")}>Done</button>
     </div>
   );
 }

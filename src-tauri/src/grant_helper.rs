@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const LABEL: &str = "grant-helper";
 const WIDTH: f64 = 260.0;
-const HEIGHT: f64 = 300.0;
+const HEIGHT: f64 = 340.0;
 
 /// The app bundle this process runs from, if it runs from one.
 pub fn own_bundle() -> Option<PathBuf> {
@@ -88,6 +88,8 @@ pub async fn open(app: AppHandle) -> Result<(), String> {
             WebviewUrl::App("index.html?helper=grant".into()),
         )
         .title("Allow Caption Finder")
+        // Borderless, like a floating panel: no window buttons to get in the way of the icon.
+        .decorations(false)
         .inner_size(WIDTH, HEIGHT)
         .resizable(false)
         .minimizable(false)

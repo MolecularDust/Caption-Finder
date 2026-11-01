@@ -1730,7 +1730,10 @@ function App() {
                   Caption Finder window beside it. Drag its icon into the Full
                   Disk Access list, switch it on, and reopen the app. No
                   permission is needed if you choose Opera or Vivaldi instead,
-                  or sign in with the app’s own YouTube session above.
+                  or sign in with the app’s own YouTube session above. If
+                  Caption Finder is already in the list but this message
+                  stays, that entry belongs to an older build: remove it with
+                  the − button and drag the icon in again.
                 </p>
                 <div className="playback-test-actions">
                   <button
