@@ -72,6 +72,34 @@ pub fn list(dir: &Path) -> Vec<Value> {
     found
 }
 
+/// Renames a preset. Never replaces a different preset: if the new name is taken, nothing
+/// changes. Changing only the capitalisation of a name is allowed.
+pub fn rename(dir: &Path, old: &str, new: &str) -> Result<(), String> {
+    let new = new.trim();
+    if new.is_empty() || new.chars().count() > MAX_NAME {
+        return Err("Give the preset a name of up to 80 characters.".into());
+    }
+    let from = existing_path(dir, old)?;
+    let to = path_for(dir, new);
+    let same_file = file_name(old).to_lowercase() == file_name(new).to_lowercase();
+    if !same_file && to.exists() {
+        return Err(format!("A preset named “{new}” already exists."));
+    }
+    let mut value: Value = serde_json::from_str(
+        &std::fs::read_to_string(&from).map_err(|_| "Could not read the preset.")?,
+    )
+    .map_err(|_| "Could not read the preset.")?;
+    value["name"] = json!(new);
+    let text = serde_json::to_string_pretty(&value).map_err(|_| "Could not write the preset.")?;
+    let temp = to.with_extension("json.tmp");
+    std::fs::write(&temp, text).map_err(|_| "Could not write the preset.")?;
+    std::fs::rename(&temp, &to).map_err(|_| "Could not write the preset.")?;
+    if from != to && !same_file {
+        let _ = std::fs::remove_file(&from);
+    }
+    Ok(())
+}
+
 pub fn delete(dir: &Path, name: &str) -> Result<(), String> {
     let path = path_for(dir, name);
     if path.is_file() {
@@ -121,6 +149,26 @@ mod tests {
         delete(&dir, "Beta").unwrap();
         assert!(existing_path(&dir, "Beta").is_err());
         assert_eq!(list(&dir).len(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn renames_without_replacing_another_preset() {
+        let dir = scratch();
+        save(&dir, "One", channels()).unwrap();
+        save(&dir, "Two", json!([{ "source": "@other" }])).unwrap();
+        // A taken name is refused and both presets stay as they were.
+        assert!(rename(&dir, "One", "two").is_err());
+        assert_eq!(list(&dir).len(), 2);
+        rename(&dir, "One", "Uno").unwrap();
+        let names: Vec<_> = list(&dir).iter().map(|v| v["name"].as_str().unwrap().to_string()).collect();
+        assert_eq!(names, ["Two", "Uno"]);
+        assert!(existing_path(&dir, "One").is_err());
+        // Only the capitalisation changes: the same file, not a clash.
+        rename(&dir, "Uno", "UNO").unwrap();
+        assert_eq!(list(&dir).iter().filter(|v| v["name"] == "UNO").count(), 1);
+        assert_eq!(list(&dir).len(), 2);
+        assert!(rename(&dir, "Missing", "X").is_err());
+        assert!(rename(&dir, "Two", "  ").is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]

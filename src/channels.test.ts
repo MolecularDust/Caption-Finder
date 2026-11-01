@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { looksLikeChannel, mergedLister, subscriberText } from "./channels";
+import { isVideoLink, looksLikeChannel, mergedLister, subscriberText } from "./channels";
 
 const ids = (prefix: string, n: number) =>
   Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}` }));
@@ -63,6 +63,21 @@ describe("channel text", () => {
     expect(looksLikeChannel("https://www.youtube.com/@TED/videos")).toBe(true);
     expect(looksLikeChannel("UCAuUUnT6oDeKwE6v1NGQxug")).toBe(true);
     expect(looksLikeChannel("ted talks")).toBe(false);
+  });
+  it("recognises video links, which are not channel links", () => {
+    for (const link of [
+      "https://www.youtube.com/watch?v=SDSzIs9K_Sg",
+      "https://youtube.com/watch?feature=share&v=SDSzIs9K_Sg&t=5s",
+      "https://m.youtube.com/watch?v=SDSzIs9K_Sg",
+      "https://youtu.be/SDSzIs9K_Sg?t=10",
+      "https://www.youtube.com/shorts/SDSzIs9K_Sg",
+    ]) {
+      expect(isVideoLink(link)).toBe(true);
+      expect(looksLikeChannel(link)).toBe(false);
+    }
+    expect(isVideoLink("https://www.youtube.com/@TED/videos")).toBe(false);
+    expect(isVideoLink("https://www.youtube.com/watch?v=short")).toBe(false);
+    expect(looksLikeChannel("https://www.youtube.com/@TED/videos")).toBe(true);
   });
   it("shortens subscriber counts", () => {
     expect(subscriberText(27900000)).toBe("27.9M");

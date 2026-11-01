@@ -39,6 +39,7 @@ import {
   type SearchResult,
 } from "./search";
 import {
+  isVideoLink,
   looksLikeChannel,
   mergedLister,
   subscriberText,
@@ -104,11 +105,20 @@ function App() {
       y: number;
       name: string;
     } | null>(null),
+    [chipMenu, setChipMenu] = useState<{
+      x: number;
+      y: number;
+      source: string;
+    } | null>(null),
     [presetName, setPresetName] = useState<string | null>(null),
+    [renaming, setRenaming] = useState<{ from: string; value: string } | null>(
+      null,
+    ),
     [suggestions, setSuggestions] = useState<ChannelSuggestion[]>([]),
     [suggesting, setSuggesting] = useState(false),
     [suggestOpen, setSuggestOpen] = useState(false),
     [channelNote, setChannelNote] = useState(""),
+    [lookingUpVideo, setLookingUpVideo] = useState(false),
     [captionSource, setCaptionSource] = useState<string>(() => {
       try {
         const saved = localStorage.getItem("cf.captionSource");
@@ -631,6 +641,15 @@ function App() {
       setPresetName(null);
       await refreshPresets();
     });
+  const renamePreset = () =>
+    act(async () => {
+      if (!renaming) return;
+      const value = renaming.value.trim();
+      if (value && value !== renaming.from)
+        await invoke("rename_preset", { old: renaming.from, new: value });
+      setRenaming(null);
+      await refreshPresets();
+    });
   const deletePreset = (name: string) =>
     act(async () => {
       await invoke("delete_preset", { name });
@@ -674,8 +693,11 @@ function App() {
     })();
   }, []);
   useEffect(() => {
-    if (!presetMenu) return;
-    const close = () => setPresetMenu(null);
+    if (!presetMenu && !chipMenu) return;
+    const close = () => {
+      setPresetMenu(null);
+      setChipMenu(null);
+    };
     const key = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("click", close);
     window.addEventListener("blur", close);
@@ -685,7 +707,7 @@ function App() {
       window.removeEventListener("blur", close);
       window.removeEventListener("keydown", key);
     };
-  }, [presetMenu]);
+  }, [presetMenu, chipMenu]);
   // Loading a preset replaces the current channels, and drops results from the ones it replaces.
   const loadPreset = (p: ChannelPreset) => {
     const keep = new Set(p.channels.map((c) => c.source));
@@ -702,42 +724,103 @@ function App() {
       subscribers: c.subscribers,
       thumbnail: c.thumbnail,
     });
-  // Look channels up by name as the user types, after a short pause.
+  // Recent lookups, so typing a name again doesn't search again.
+  const lookupCache = useRef(
+    new Map<string, { at: number; found: ChannelSuggestion[] }>(),
+  );
+  // Starts the pending lookup now, for Enter pressed before the typing pause has run out.
+  const lookupNow = useRef<(() => void) | null>(null);
+  // Look channels up as the user types, after a short pause, or find the channel of a pasted
+  // video link. A lookup the user has typed past is stopped rather than left to finish.
   useEffect(() => {
     const text = channel.trim();
     const request = ++suggestRequest.current;
+    const video = isVideoLink(text);
+    lookupNow.current = null;
     setChannelNote("");
-    if (!isTauri() || text.length < 2 || looksLikeChannel(text)) {
+    setLookingUpVideo(video);
+    if (isTauri()) void invoke("cancel_channel_lookups");
+    if (!isTauri() || (!video && (text.length < 2 || looksLikeChannel(text)))) {
       setSuggestions([]);
       setSuggesting(false);
       return;
     }
+    const key = `${video ? "v" : "q"}:${text.toLowerCase()}`;
+    const cached = lookupCache.current.get(key);
+    if (cached && Date.now() - cached.at < 5 * 60 * 1000) {
+      setSuggestions(cached.found);
+      setChannelNote(cached.found.length ? "" : "No channels found.");
+      setSuggesting(false);
+      return;
+    }
+    setSuggestions([]);
     setSuggesting(true);
-    const timer = window.setTimeout(() => {
-      invoke<ChannelSuggestion[]>("find_channels", { query: text })
-        .then((found) => {
-          if (request !== suggestRequest.current) return;
-          setSuggestions(found);
-          setChannelNote(found.length ? "" : "No channels found.");
-        })
-        .catch((e) => {
-          if (request === suggestRequest.current) {
-            setSuggestions([]);
-            setChannelNote(String(e));
-          }
-        })
-        .finally(() => {
-          if (request === suggestRequest.current) setSuggesting(false);
-        });
-    }, 600);
-    return () => window.clearTimeout(timer);
+    let started = false;
+    const run = () => {
+      if (started) return;
+      started = true;
+      {
+        const lookup = video
+          ? invoke<ChannelSuggestion>("channel_of_video", { url: text }).then(
+              (c) => [c],
+            )
+          : invoke<ChannelSuggestion[]>("find_channels", { query: text });
+        lookup
+          .then((found) => {
+            if (request !== suggestRequest.current) return;
+            lookupCache.current.set(key, { at: Date.now(), found });
+            setSuggestions(found);
+            setChannelNote(found.length ? "" : "No channels found.");
+          })
+          .catch((e) => {
+            if (request === suggestRequest.current) {
+              setSuggestions([]);
+              setChannelNote(String(e));
+            }
+          })
+          .finally(() => {
+            if (request === suggestRequest.current) setSuggesting(false);
+          });
+      }
+    };
+    const timer = window.setTimeout(run, video ? 0 : 600);
+    lookupNow.current = () => {
+      window.clearTimeout(timer);
+      run();
+    };
+    return () => {
+      window.clearTimeout(timer);
+      lookupNow.current = null;
+    };
   }, [channel]);
   const submitChannelText = () => {
     const text = channel.trim();
     if (!text) return;
-    if (looksLikeChannel(text)) addChannel({ source: text, title: text.replace(/^https?:\/\/(www\.)?youtube\.com\//i, "").replace(/\/videos\/?$/, "") });
-    else if (suggestions[0]) addSuggestion(suggestions[0]);
+    if (looksLikeChannel(text))
+      addChannel({
+        source: text,
+        title: text
+          .replace(/^https?:\/\/(www\.)?youtube\.com\//i, "")
+          .replace(/\/videos\/?$/, ""),
+      });
+    else {
+      // Enter on a name only shows the matching channels; the user picks one deliberately.
+      setSuggestOpen(true);
+      lookupNow.current?.();
+    }
   };
+  // Whether Enter will do something for the text in the field: add a pasted link or handle,
+  // or show the matching channels while they haven't been listed yet.
+  const channelText = channel.trim();
+  const enterHint = !channelText
+    ? ""
+    : looksLikeChannel(channelText)
+      ? "ready"
+      : channelText.length >= 2 && suggestions.length === 0 && !channelNote
+        ? suggesting
+          ? "waiting"
+          : "ready"
+        : "";
   const runSearch = async () => {
     const text = phrase.trim();
     const pending = channel.trim();
@@ -1038,12 +1121,31 @@ function App() {
                   }
                 />
               </label>
+              {enterHint && (
+                <span
+                  className={`enter-hint ${enterHint}`}
+                  title={
+                    looksLikeChannel(channelText)
+                      ? "Press Enter to add this channel"
+                      : "Press Enter to show matching channels"
+                  }
+                  aria-hidden="true"
+                >
+                  ↵
+                </span>
+              )}
               {suggestOpen && (suggesting || suggestions.length > 0 || channelNote) && (
                 <ul className="suggestions" role="listbox">
+                  {suggestions.length > 0 && lookingUpVideo && (
+                    <li className="note">Channel of this video:</li>
+                  )}
                   {suggesting && (
                     <li className="note looking">
                       <span className="spinner" aria-hidden="true" />
-                      Looking up channels<span className="dots" aria-hidden="true" />
+                      {lookingUpVideo
+                        ? "Finding this video’s channel"
+                        : "Looking up channels"}
+                      <span className="dots" aria-hidden="true" />
                     </li>
                   )}
                   {!suggesting && channelNote && <li className="note">{channelNote}</li>}
@@ -1119,18 +1221,38 @@ function App() {
                   key={p.name}
                   onContextMenu={(e) => {
                     e.preventDefault();
+                    setChipMenu(null);
                     setPresetMenu({ x: e.clientX, y: e.clientY, name: p.name });
                   }}
                 >
-                  <button
-                    type="button"
-                    className="preset-load"
-                    title={p.channels.map((c) => c.title).join(", ")}
-                    onClick={() => loadPreset(p)}
-                  >
-                    {p.name}
-                    <small>{p.channels.length}</small>
-                  </button>
+                  {renaming?.from === p.name ? (
+                    <input
+                      className="preset-rename"
+                      autoFocus
+                      value={renaming.value}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) =>
+                        setRenaming({ from: p.name, value: e.target.value })
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void renamePreset();
+                        } else if (e.key === "Escape") setRenaming(null);
+                      }}
+                      onBlur={() => setRenaming(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="preset-load"
+                      title={p.channels.map((c) => c.title).join(", ")}
+                      onClick={() => loadPreset(p)}
+                    >
+                      {p.name}
+                      <small>{p.channels.length}</small>
+                    </button>
+                  )}
                   <button
                     type="button"
                     aria-label={`Delete preset ${p.name}`}
@@ -1180,7 +1302,15 @@ function App() {
           {channels.length > 0 && (
             <div className="channel-chips" aria-label="Channels to search">
               {channels.map((c) => (
-                <span className="chip" key={c.source}>
+                <span
+                  className="chip"
+                  key={c.source}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setPresetMenu(null);
+                    setChipMenu({ x: e.clientX, y: e.clientY, source: c.source });
+                  }}
+                >
                   {c.title}
                   {c.subscribers ? <small>{subscriberText(c.subscribers)}</small> : null}
                   <button
@@ -1195,6 +1325,31 @@ function App() {
             </div>
           )}
         </section>
+        {chipMenu && (
+          <ul
+            className="context-menu"
+            role="menu"
+            style={{ left: chipMenu.x, top: chipMenu.y }}
+          >
+            <li>
+              <button
+                role="menuitem"
+                onClick={() =>
+                  removeChannels(
+                    channels.filter((c) => c.source === chipMenu.source),
+                  )
+                }
+              >
+                Remove
+              </button>
+            </li>
+            <li>
+              <button role="menuitem" onClick={() => removeChannels(channels)}>
+                Remove all
+              </button>
+            </li>
+          </ul>
+        )}
         {presetMenu && (
           <ul
             className="context-menu"
@@ -1209,6 +1364,24 @@ function App() {
                 }
               >
                 Show in Finder
+              </button>
+            </li>
+            <li>
+              <button
+                role="menuitem"
+                onClick={() =>
+                  setRenaming({ from: presetMenu.name, value: presetMenu.name })
+                }
+              >
+                Rename
+              </button>
+            </li>
+            <li>
+              <button
+                role="menuitem"
+                onClick={() => void deletePreset(presetMenu.name)}
+              >
+                Remove
               </button>
             </li>
           </ul>

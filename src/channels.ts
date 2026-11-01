@@ -18,8 +18,15 @@ export type ChannelSuggestion = {
   thumbnail?: string;
 };
 
+/** A link to one video (watch, shorts or youtu.be), whose channel can be looked up. */
+export const isVideoLink = (text: string) =>
+  /^(https?:\/\/)?((www|m)\.)?(youtube\.com\/(watch\?([^#]*&)?v=|shorts\/)|youtu\.be\/)[\w-]{11}/i.test(
+    text.trim(),
+  );
+
 /** True for text that names one channel directly rather than something to look up. */
 export const looksLikeChannel = (text: string) =>
+  !isVideoLink(text) &&
   /^(https?:\/\/|www\.|youtube\.com|@|UC[\w-]{22}$)/i.test(text.trim());
 
 export const subscriberText = (n?: number) => {

@@ -254,6 +254,10 @@ fn save_preset(app: tauri::AppHandle, name: String, channels: serde_json::Value)
     presets::save(&presets_dir(&app)?, &name, channels)
 }
 #[tauri::command]
+fn rename_preset(app: tauri::AppHandle, old: String, new: String) -> Result<(), String> {
+    presets::rename(&presets_dir(&app)?, &old, &new)
+}
+#[tauri::command]
 fn delete_preset(app: tauri::AppHandle, name: String) -> Result<(), String> {
     presets::delete(&presets_dir(&app)?, &name)
 }
@@ -274,6 +278,22 @@ fn reveal_preset(app: tauri::AppHandle, name: String) -> Result<(), String> {
     #[cfg(not(any(target_os = "macos", windows)))]
     return Err("Showing files is not implemented for this platform".into());
     Ok(())
+}
+#[tauri::command]
+async fn channel_of_video(
+    app: tauri::AppHandle,
+    url: String,
+    s: State<'_, Backend>,
+) -> Result<serde_json::Value, String> {
+    let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
+    tauri::async_runtime::spawn_blocking(move || channel::of_video(settings, &url))
+        .await
+        .map_err(|_| "Channel worker stopped".to_string())?
+}
+#[tauri::command]
+fn cancel_channel_lookups() {
+    channel::cancel_lookups();
 }
 #[tauri::command]
 async fn find_channels(
@@ -1291,9 +1311,12 @@ pub fn run() {
             analyze,
             list_channel,
             find_channels,
+            channel_of_video,
+            cancel_channel_lookups,
             list_presets,
             save_preset,
             delete_preset,
+            rename_preset,
             reveal_preset,
             caption_track,
             enqueue,

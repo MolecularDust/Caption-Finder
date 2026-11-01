@@ -1,6 +1,82 @@
 use crate::{base, model::Settings, platform, safe_error};
 use serde_json::{json, Value};
 use std::process::Stdio;
+use std::sync::Mutex;
+
+/// Processes of channel lookups in flight, so that a lookup the user has typed past can be
+/// stopped instead of running to the end for an answer nobody wants.
+static LOOKUPS: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+
+#[cfg(unix)]
+fn run_lookup(c: &mut std::process::Command) -> std::io::Result<std::process::Output> {
+    c.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let child = platform::spawn(c)?;
+    let pid = child.id();
+    LOOKUPS.lock().unwrap_or_else(|e| e.into_inner()).push(pid);
+    let output = child.wait_with_output();
+    LOOKUPS.lock().unwrap_or_else(|e| e.into_inner()).retain(|p| *p != pid);
+    output
+}
+#[cfg(not(unix))]
+fn run_lookup(c: &mut std::process::Command) -> std::io::Result<std::process::Output> {
+    c.stdout(Stdio::piped()).stderr(Stdio::piped());
+    platform::output(c)
+}
+
+/// Stops every channel lookup that is still running.
+pub fn cancel_lookups() {
+    let pids: Vec<u32> = LOOKUPS.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect();
+    for pid in pids {
+        let _ = platform::signal(pid, "cancel");
+    }
+}
+
+/// The channel a video belongs to, for suggesting it when someone pastes a video link.
+pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
+    let video = crate::model::normalize(url)?;
+    let mut c = base(&settings)?;
+    c.args([
+        "--no-playlist",
+        "--skip-download",
+        "--print",
+        "%(channel_id)s\t%(channel)s\t%(uploader_id)s\t%(channel_follower_count)s",
+        "--",
+        &video,
+    ]);
+    let o = run_lookup(&mut c).map_err(|_| "Cannot start yt-dlp")?;
+    let stderr = String::from_utf8_lossy(&o.stderr).into_owned();
+    crate::diagnostics::log(
+        crate::diagnostics::Stage::ChannelList,
+        &settings,
+        o.status.code(),
+        &stderr,
+    );
+    parse_video_channel(&String::from_utf8_lossy(&o.stdout)).ok_or_else(|| {
+        if stderr.trim().is_empty() {
+            "Couldn’t find that video’s channel.".to_string()
+        } else {
+            safe_error(&stderr)
+        }
+    })
+}
+
+fn parse_video_channel(output: &str) -> Option<Value> {
+    let line = output.lines().find(|l| l.contains('\t'))?;
+    let mut parts = line.split('\t');
+    let id = parts.next()?.trim();
+    let title = parts.next()?.trim();
+    let handle = parts.next().unwrap_or("").trim();
+    let subscribers = parts.next().and_then(|s| s.trim().parse::<u64>().ok());
+    if !id.starts_with("UC") || title.is_empty() || title == "NA" {
+        return None;
+    }
+    Some(json!({
+        "id": id,
+        "title": title,
+        "handle": (handle != "NA" && !handle.is_empty()).then_some(handle),
+        "subscribers": subscribers,
+    }))
+}
 
 /// Channel list address for a link, an @handle, or a bare channel id.
 pub fn channel_url(input: &str) -> Result<String, String> {
@@ -90,9 +166,8 @@ pub fn find(settings: Settings, query: &str) -> Result<Vec<Value>, String> {
         "--",
         &url,
     ])
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped());
-    let o = platform::output(&mut c).map_err(|_| "Cannot start yt-dlp")?;
+    ;
+    let o = run_lookup(&mut c).map_err(|_| "Cannot start yt-dlp")?;
     let stderr = String::from_utf8_lossy(&o.stderr).into_owned();
     crate::diagnostics::log(
         crate::diagnostics::Stage::ChannelList,
@@ -244,5 +319,26 @@ mod find_tests {
         assert_eq!(percent_encode("TED talks"), "TED%20talks");
         assert_eq!(percent_encode("a&b=c"), "a%26b%3Dc");
         assert_eq!(percent_encode("é"), "%C3%A9");
+    }
+}
+
+#[cfg(test)]
+mod video_channel_tests {
+    use super::parse_video_channel;
+    #[test]
+    fn reads_a_video_channel_line() {
+        let v = parse_video_channel("UCAuUUnT6oDeKwE6v1NGQxug\tTED\t@TED\t27900000\n").unwrap();
+        assert_eq!(v["id"], "UCAuUUnT6oDeKwE6v1NGQxug");
+        assert_eq!(v["title"], "TED");
+        assert_eq!(v["handle"], "@TED");
+        assert_eq!(v["subscribers"], 27900000);
+    }
+    #[test]
+    fn copes_with_missing_fields_and_rejects_junk() {
+        let v = parse_video_channel("UCx\tSome channel\tNA\tNA").unwrap();
+        assert!(v["handle"].is_null() && v["subscribers"].is_null());
+        assert!(parse_video_channel("NA\tNA\tNA\tNA").is_none());
+        assert!(parse_video_channel("").is_none());
+        assert!(parse_video_channel("a warning line").is_none());
     }
 }
