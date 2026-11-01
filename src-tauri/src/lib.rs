@@ -7,6 +7,7 @@ mod grant_helper;
 mod model;
 mod network;
 mod platform;
+mod presets;
 mod preview;
 mod player;
 mod metadata;
@@ -240,6 +241,39 @@ async fn caption_track(
         s.metadata.put(id, raw);
     }
     Ok(value)
+}
+fn presets_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(presets::folder(&app.path().data_dir().map_err(|_| "Cannot locate the data folder")?))
+}
+#[tauri::command]
+fn list_presets(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    Ok(presets::list(&presets_dir(&app)?))
+}
+#[tauri::command]
+fn save_preset(app: tauri::AppHandle, name: String, channels: serde_json::Value) -> Result<(), String> {
+    presets::save(&presets_dir(&app)?, &name, channels)
+}
+#[tauri::command]
+fn delete_preset(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    presets::delete(&presets_dir(&app)?, &name)
+}
+#[tauri::command]
+fn reveal_preset(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    let path = presets::existing_path(&presets_dir(&app)?, &name)?;
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("/usr/bin/open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map_err(|_| "Could not open Finder")?;
+    #[cfg(windows)]
+    std::process::Command::new("explorer.exe")
+        .arg(format!("/select,{}", path.display()))
+        .spawn()
+        .map_err(|_| "Could not open the file manager")?;
+    #[cfg(not(any(target_os = "macos", windows)))]
+    return Err("Showing files is not implemented for this platform".into());
+    Ok(())
 }
 #[tauri::command]
 async fn find_channels(
@@ -1257,6 +1291,10 @@ pub fn run() {
             analyze,
             list_channel,
             find_channels,
+            list_presets,
+            save_preset,
+            delete_preset,
+            reveal_preset,
             caption_track,
             enqueue,
             jobs,

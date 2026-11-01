@@ -98,16 +98,12 @@ function App() {
         return [];
       }
     }),
-    [presets, setPresets] = useState<ChannelPreset[]>(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem("cf.presets") ?? "[]");
-        return Array.isArray(saved)
-          ? saved.filter((p) => p && typeof p.name === "string" && Array.isArray(p.channels))
-          : [];
-      } catch {
-        return [];
-      }
-    }),
+    [presets, setPresets] = useState<ChannelPreset[]>([]),
+    [presetMenu, setPresetMenu] = useState<{
+      x: number;
+      y: number;
+      name: string;
+    } | null>(null),
     [presetName, setPresetName] = useState<string | null>(null),
     [suggestions, setSuggestions] = useState<ChannelSuggestion[]>([]),
     [suggesting, setSuggesting] = useState(false),
@@ -622,23 +618,65 @@ function App() {
     }
   };
   const removeChannel = (c: ChannelChoice) => removeChannels([c]);
-  const savePresets = (next: ChannelPreset[]) => {
-    setPresets(next);
-    try {
-      localStorage.setItem("cf.presets", JSON.stringify(next));
-    } catch {
-      /* remembering presets is only a convenience */
-    }
-  };
-  const savePreset = () => {
-    const name = (presetName ?? "").trim();
-    if (!name || !channels.length) return;
-    savePresets([
-      ...presets.filter((p) => p.name.toLowerCase() !== name.toLowerCase()),
-      { name, channels },
-    ]);
-    setPresetName(null);
-  };
+  // Presets are files in the user's data folder, so they outlive a reset or reinstall.
+  const refreshPresets = () =>
+    invoke<ChannelPreset[]>("list_presets")
+      .then(setPresets)
+      .catch(() => setPresets([]));
+  const savePreset = () =>
+    act(async () => {
+      const name = (presetName ?? "").trim();
+      if (!name || !channels.length) return;
+      await invoke("save_preset", { name, channels });
+      setPresetName(null);
+      await refreshPresets();
+    });
+  const deletePreset = (name: string) =>
+    act(async () => {
+      await invoke("delete_preset", { name });
+      await refreshPresets();
+    });
+  useEffect(() => {
+    if (!isTauri()) return;
+    void (async () => {
+      // Presets saved by earlier versions lived in the browser storage; move them to files.
+      try {
+        const old = JSON.parse(localStorage.getItem("cf.presets") ?? "[]");
+        if (Array.isArray(old)) {
+          const have = new Set(
+            (await invoke<ChannelPreset[]>("list_presets")).map((p) =>
+              p.name.toLowerCase(),
+            ),
+          );
+          for (const p of old)
+            if (
+              p &&
+              typeof p.name === "string" &&
+              Array.isArray(p.channels) &&
+              !have.has(p.name.toLowerCase())
+            )
+              await invoke("save_preset", { name: p.name, channels: p.channels });
+        }
+        localStorage.removeItem("cf.presets");
+      } catch {
+        /* nothing to move, or storage unavailable */
+      }
+      await refreshPresets();
+    })();
+  }, []);
+  useEffect(() => {
+    if (!presetMenu) return;
+    const close = () => setPresetMenu(null);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("click", close);
+    window.addEventListener("blur", close);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("blur", close);
+      window.removeEventListener("keydown", key);
+    };
+  }, [presetMenu]);
   // Loading a preset replaces the current channels, and drops results from the ones it replaces.
   const loadPreset = (p: ChannelPreset) => {
     const keep = new Set(p.channels.map((c) => c.source));
@@ -1067,7 +1105,14 @@ function App() {
             <div className="preset-row" aria-label="Channel presets">
               {presets.length > 0 && <span className="preset-label">Presets</span>}
               {presets.map((p) => (
-                <span className="chip preset" key={p.name}>
+                <span
+                  className="chip preset"
+                  key={p.name}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setPresetMenu({ x: e.clientX, y: e.clientY, name: p.name });
+                  }}
+                >
                   <button
                     type="button"
                     className="preset-load"
@@ -1080,7 +1125,7 @@ function App() {
                   <button
                     type="button"
                     aria-label={`Delete preset ${p.name}`}
-                    onClick={() => savePresets(presets.filter((x) => x !== p))}
+                    onClick={() => void deletePreset(p.name)}
                   >
                     ×
                   </button>
@@ -1141,6 +1186,24 @@ function App() {
             </div>
           )}
         </section>
+        {presetMenu && (
+          <ul
+            className="context-menu"
+            role="menu"
+            style={{ left: presetMenu.x, top: presetMenu.y }}
+          >
+            <li>
+              <button
+                role="menuitem"
+                onClick={() =>
+                  act(() => invoke("reveal_preset", { name: presetMenu.name }))
+                }
+              >
+                Show in Finder
+              </button>
+            </li>
+          </ul>
+        )}
         <div className="panes">
           <section className="results-card" aria-label="Matching videos">
             <div className="video-info">
