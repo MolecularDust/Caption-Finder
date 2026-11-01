@@ -390,9 +390,7 @@ input::placeholder {
   padding: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns:
-    minmax(185px, 1fr) minmax(185px, 1fr) 85px 120px
-    auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 85px 120px;
   gap: 10px 12px;
   align-items: start;
   margin: 0 0 20px;
@@ -477,11 +475,14 @@ input::placeholder {
   font-size: 11px;
   padding: 8px;
 }
+/* Preview and Reset get their own row so they never run past the edge of a narrow pane. */
 .trim-controls > .preview-button {
-  grid-column: 5;
+  grid-column: 1 / 3;
+  grid-row: 3;
 }
 .trim-controls > .reset-button {
-  grid-column: 6;
+  grid-column: 3 / 5;
+  grid-row: 3;
 }
 .length-input {
   grid-column: 3;
@@ -1069,15 +1070,7 @@ div.check input {
 }
 @media (max-width: 780px) {
   .trim-controls {
-    grid-template-columns: minmax(185px, 1fr) minmax(185px, 1fr) 85px 100px;
-  }
-  .trim-controls > .preview-button {
-    grid-column: 2 / 4;
-    grid-row: 3;
-  }
-  .trim-controls > .reset-button {
-    grid-column: 4;
-    grid-row: 3;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 85px 100px;
   }
 }
 

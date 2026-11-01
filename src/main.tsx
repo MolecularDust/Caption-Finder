@@ -327,7 +327,10 @@ function App() {
       setPreviewActive(false);
     }
     if (type === "state" && value === 1) setPlayerError("");
-    if (type === "ready") setReady(true);
+    // The player's one-time "ready" message can be missed (a reselected result keeps its
+    // player); position and state updates prove it is running.
+    if (type === "ready" || ((type === "time" || type === "state") && !playerError))
+      setReady(true);
     if (type === "error") {
       setReady(false);
       previewing.current = false;
