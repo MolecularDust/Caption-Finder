@@ -501,7 +501,7 @@ function App() {
     setSearchStatus((old) => ({ ...old, state: "done", reason: "cancelled" }));
   };
   useEffect(() => {
-    if (!candidate && results.length === 1) selectResult(results[0]);
+    if (!candidate && results.length > 0) selectResult(results[0]);
   }, [results]);
   const formats =
     video?.formats.filter((f) => f.height && f.vcodec !== "none") ?? [];

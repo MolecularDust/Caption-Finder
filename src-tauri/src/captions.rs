@@ -1,4 +1,4 @@
-use crate::{base, base_with, model::Settings, safe_error};
+use crate::{base, model::Settings, safe_error};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 struct TempDir(PathBuf);
@@ -169,82 +169,6 @@ fn assemble(
     )
 }
 
-/// Faster variant for scanning many videos: one yt-dlp run fetches the metadata and the
-/// captions together, without the per-request pauses that single lookups use. Callers back
-/// off when YouTube rate-limits.
-pub fn retrieve_quick(
-    url: String,
-    language: String,
-    settings: Settings,
-    cache: PathBuf,
-) -> Result<Value, String> {
-    let normalized = crate::model::normalize(&url)?;
-    if language.len() > 3 || language.len() < 2 || !language.bytes().all(|c| c.is_ascii_lowercase())
-    {
-        return Err("Unsupported caption language code".into());
-    }
-    let dir = TempDir(cache.join(uuid::Uuid::new_v4().to_string()));
-    std::fs::create_dir_all(&dir.0).map_err(|_| "Cannot create temporary subtitle folder")?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&dir.0, std::fs::Permissions::from_mode(0o700))
-            .map_err(|_| "Cannot secure temporary subtitle folder")?;
-    }
-    let mut c = base_with(&settings, false)?;
-    c.args([
-        "--skip-download",
-        // Without the JavaScript runtime no formats can be resolved; captions and metadata
-        // are all this path needs.
-        "--ignore-no-formats-error",
-        "--write-info-json",
-        "--write-subs",
-        "--write-auto-subs",
-        "--sub-format",
-        "json3",
-        "--sub-langs",
-        &format!("{language},{language}-orig"),
-        // Later options win over base()'s pauses.
-        "--sleep-requests",
-        "0",
-        "--sleep-subtitles",
-        "0",
-    ]);
-    let o = crate::platform::output(
-        c.arg("-o")
-            .arg(dir.0.join("v.%(ext)s"))
-            .arg("--")
-            .arg(&normalized),
-    )
-    .map_err(|_| "Cannot retrieve captions")?;
-    let stderr = String::from_utf8_lossy(&o.stderr).into_owned();
-    crate::diagnostics::log(
-        crate::diagnostics::Stage::Captions,
-        &settings,
-        o.status.code(),
-        &stderr,
-    );
-    let info = dir.0.join("v.info.json");
-    let v: Value = match std::fs::read(&info) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| "Invalid caption metadata")?,
-        Err(_) => return Err(format!("Caption request: {}", safe_error(&stderr))),
-    };
-    if v["is_live"].as_bool() == Some(true)
-        || !v["duration"]
-            .as_f64()
-            .is_some_and(|d| d.is_finite() && d > 0.)
-    {
-        return Err("Choose a finished video with a finite duration.".into());
-    }
-    let (code, automatic) = track(&v, &language).ok_or(
-        "No supplied or original automatic captions in this language. Translations are not used.",
-    )?;
-    let path = dir.0.join(format!("v.{code}.json3"));
-    if !path.is_file() {
-        return Err(format!("Caption request: {}", safe_error(&stderr)));
-    }
-    assemble(&v, &normalized, code, automatic, &path)
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,31 +185,6 @@ mod tests {
 #[cfg(test)]
 mod network_tests {
     use super::*;
-    #[test]
-    #[ignore = "Requires network access and yt-dlp"]
-    fn quick_retrieval_matches_the_standard_result_and_is_faster() {
-        let url = "https://www.youtube.com/watch?v=H14bBuluwB8";
-        let cache = std::env::temp_dir().join(format!("cf-caption-quick-{}", uuid::Uuid::new_v4()));
-        // Set CF_TEST_BROWSER (for example "opera") when YouTube demands a signed-in session.
-        let settings = Settings {
-            browser: std::env::var("CF_TEST_BROWSER").unwrap_or_default(),
-            ..Settings::default()
-        };
-        let t = std::time::Instant::now();
-        let quick = retrieve_quick(url.into(), "en".into(), settings.clone(), cache.clone()).unwrap();
-        let quick_time = t.elapsed();
-        let t = std::time::Instant::now();
-        let standard = retrieve(url.into(), "en".into(), settings, cache.clone()).unwrap().0;
-        let standard_time = t.elapsed();
-        println!("quick {quick_time:?} vs standard {standard_time:?}");
-        let n = |v: &Value| v["track"]["cues"].as_array().unwrap().len();
-        assert!(n(&quick) > 0);
-        assert_eq!(n(&quick), n(&standard));
-        assert_eq!(quick["track"]["kind"], standard["track"]["kind"]);
-        assert_eq!(std::fs::read_dir(&cache).unwrap().count(), 0);
-        std::fs::remove_dir(cache).unwrap();
-        assert!(quick_time < standard_time);
-    }
 
     #[test]
     #[ignore = "Requires network access and pinned media tools"]

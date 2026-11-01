@@ -40,6 +40,7 @@ const run = (d: SearchDeps, phrase: string, limit = 25, batch = 3) => {
     batch,
     cap: 30,
     concurrency: 2,
+    backoffMs: 1,
     signal: new AbortController().signal,
     onResult: (r) => results.push(r),
     onProgress: () => {},
@@ -69,11 +70,31 @@ describe("searchChannel", () => {
     expect(await run(d, "we will visit").outcome).toMatchObject({ found: 3 });
   });
 
-  it("stops on rate limiting", async () => {
-    const d = deps(ids, { ...texts, a: new Error("YouTube rate-limited this request.") });
+  it("keeps retrying a rate-limited video, then stops if it never clears", async () => {
+    const limited = new Error("YouTube rate-limited this request.");
+    const d = deps(ids, { ...texts, a: limited });
     const out = await run(d, "we will visit").outcome;
     expect(out.reason).toBe("blocked");
     expect(out.error).toMatch(/rate-limited/);
+  });
+
+  it("carries on when a rate limit clears after a pause", async () => {
+    const base = deps(ids, texts);
+    let failures = 2;
+    const d: SearchDeps = {
+      ...base,
+      captions: async (id) => {
+        if (id === "b" && failures-- > 0)
+          throw new Error("YouTube rate-limited this request.");
+        return base.captions(id);
+      },
+    };
+    expect(await run(d, "we will visit").outcome).toMatchObject({ found: 3, reason: "exhausted" });
+  });
+
+  it("stops at once when the browser's cookies can't be read", async () => {
+    const d = deps(ids, { ...texts, a: new Error("Browser cookies are unavailable. Check the browser.") });
+    expect((await run(d, "we will visit").outcome).reason).toBe("blocked");
   });
 
   it("stops after several access denials in a row, not one", async () => {

@@ -57,11 +57,6 @@ fn auth(c: &mut std::process::Command, s: &Settings) -> Result<(), String> {
 /// yt-dlp command shared by lookups and downloads. Requests are not artificially delayed;
 /// the queue's cooldown spaces consecutive downloads instead.
 fn base(s: &Settings) -> Result<std::process::Command, String> {
-    base_with(s, true)
-}
-/// `js_runtime: false` skips the bundled JavaScript runtime. Only format URLs need it, and it
-/// runs in a slow interpreter mode, so caption scans leave it out.
-fn base_with(s: &Settings, js_runtime: bool) -> Result<std::process::Command, String> {
     let mut c = platform::command("yt-dlp")?;
     c.args([
         "--ignore-config",
@@ -81,10 +76,8 @@ fn base_with(s: &Settings, js_runtime: bool) -> Result<std::process::Command, St
     if let Ok(p) = platform::binary("ffmpeg") {
         c.arg("--ffmpeg-location").arg(p.parent().unwrap());
     }
-    if js_runtime {
-        if let Ok(p) = platform::binary("deno") {
-            c.arg("--js-runtimes").arg(format!("deno:{}", p.display()));
-        }
+    if let Ok(p) = platform::binary("deno") {
+        c.arg("--js-runtimes").arg(format!("deno:{}", p.display()));
     }
     match platform::cache_dir() {
         Some(dir) => c.arg("--cache-dir").arg(dir),
@@ -184,7 +177,6 @@ async fn caption_track(
     app: tauri::AppHandle,
     url: String,
     language: String,
-    quick: Option<bool>,
     s: State<'_, Backend>,
 ) -> Result<serde_json::Value, String> {
     let settings = s.settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
@@ -198,18 +190,12 @@ async fn caption_track(
     }
     .join("captions");
 
-    let (value, raw) = tauri::async_runtime::spawn_blocking(move || {
-        if quick == Some(true) {
-            // The quick path has no format list, so its metadata must not stand in for a download's.
-            captions::retrieve_quick(url, language, settings, cache).map(|v| (v, None))
-        } else {
-            captions::retrieve(url, language, settings, cache).map(|(v, raw)| (v, Some(raw)))
-        }
-    })
-    .await
-    .map_err(|_| "Caption worker stopped".to_string())??;
+    let (value, raw) =
+        tauri::async_runtime::spawn_blocking(move || captions::retrieve(url, language, settings, cache))
+            .await
+            .map_err(|_| "Caption worker stopped".to_string())??;
     // Keep the full metadata so the download of this video can skip extracting it again.
-    if let (Some(id), Some(raw)) = (value["video"]["id"].as_str(), raw) {
+    if let Some(id) = value["video"]["id"].as_str() {
         s.metadata.put(id, raw);
     }
     Ok(value)

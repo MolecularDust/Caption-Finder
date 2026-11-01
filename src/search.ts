@@ -29,6 +29,8 @@ export type SearchOptions = {
   signal: AbortSignal;
   onResult(result: SearchResult): void;
   onProgress(scanned: number, found: number): void;
+  /** base pause after YouTube rate-limits a request; grows with each retry */
+  backoffMs?: number;
 };
 export type SearchOutcome = {
   scanned: number;
@@ -37,10 +39,13 @@ export type SearchOutcome = {
   error?: string;
 };
 
-// Messages from the backend's safe_error that mean "stop", not "skip this video".
-const rateLimited = /rate-limited|cookies are unavailable|cookie database/i;
+// Messages from the backend's safe_error. Rate limiting is retried after a pause;
+// unreadable cookies stop the search; access denials stop it only when repeated.
+const rateLimited = /rate-limited/i;
+const cookieProblem = /cookies are unavailable|cookie database/i;
 const denied = /denied access/i;
 const DENIED_IN_A_ROW = 3;
+const RATE_LIMIT_ATTEMPTS = 4;
 
 /**
  * Walks a channel newest-first and collects videos whose captions contain the
@@ -53,6 +58,34 @@ export async function searchChannel(
   options: SearchOptions,
 ): Promise<SearchOutcome> {
   const { limit, batch, cap, concurrency, signal } = options;
+  const backoff = options.backoffMs ?? 15000;
+  let pausedUntil = 0;
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+  // One shared pause, so every worker backs off together when YouTube says slow down.
+  const captions = async (id: string) => {
+    for (let attempt = 1; ; attempt++) {
+      const wait = pausedUntil - Date.now();
+      if (wait > 0) await sleep(wait);
+      try {
+        return await deps.captions(id);
+      } catch (e) {
+        if (!rateLimited.test(String(e)) || attempt >= RATE_LIMIT_ATTEMPTS)
+          throw e;
+        pausedUntil = Date.now() + backoff * attempt;
+      }
+    }
+  };
   let scanned = 0,
     found = 0,
     deniedRun = 0,
@@ -72,7 +105,7 @@ export async function searchChannel(
         const index = next++;
         if (index >= entries.length) return;
         try {
-          const { video, track } = await deps.captions(entries[index].id);
+          const { video, track } = await captions(entries[index].id);
           if (signal.aborted) return;
           deniedRun = 0;
           const matches = findSubtitleMatches(track.cues, phrase);
@@ -89,7 +122,8 @@ export async function searchChannel(
         } catch (e) {
           if (signal.aborted) return;
           const message = String(e);
-          if (rateLimited.test(message)) error = message;
+          if (rateLimited.test(message) || cookieProblem.test(message))
+            error = message;
           else if (denied.test(message) && ++deniedRun >= DENIED_IN_A_ROW)
             error = message;
         }
