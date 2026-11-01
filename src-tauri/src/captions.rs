@@ -1,6 +1,6 @@
 use crate::{base, base_with, model::Settings, safe_error};
 use serde_json::{json, Value};
-use std::{path::PathBuf, process::Stdio};
+use std::path::PathBuf;
 struct TempDir(PathBuf);
 impl Drop for TempDir {
     fn drop(&mut self) {
@@ -40,24 +40,24 @@ pub fn retrieve(
     language: String,
     settings: Settings,
     cache: PathBuf,
-) -> Result<Value, String> {
+) -> Result<(Value, Vec<u8>), String> {
     let normalized = crate::model::normalize(&url)?;
     if language.len() > 3 || language.len() < 2 || !language.bytes().all(|c| c.is_ascii_lowercase())
     {
         return Err("Unsupported caption language code".into());
     }
     let mut c = base(&settings)?;
-    let o = crate::platform::output(
-        c.args(["--dump-single-json", "--skip-download", "--", &normalized])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped()),
-    )
-    .map_err(|_| "Cannot start caption worker")?;
-    crate::diagnostics::log(
+    if cfg!(debug_assertions) {
+        c.arg("--verbose"); // development builds only: makes yt-dlp print its phases for timing
+    }
+    let (o, trace) = crate::timing::run(c.args(["--dump-single-json", "--skip-download", "--", &normalized]))
+        .map_err(|_| "Cannot start caption worker")?;
+    crate::diagnostics::log_timed(
         crate::diagnostics::Stage::CaptionMetadata,
         &settings,
         o.status.code(),
         &String::from_utf8_lossy(&o.stderr),
+        &trace,
     );
     if !o.status.success() {
         return Err(format!(
@@ -65,7 +65,8 @@ pub fn retrieve(
             safe_error(&String::from_utf8_lossy(&o.stderr))
         ));
     }
-    let v: Value = serde_json::from_slice(&o.stdout).map_err(|_| "Invalid caption metadata")?;
+    let raw = o.stdout;
+    let v: Value = serde_json::from_slice(&raw).map_err(|_| "Invalid caption metadata")?;
     if v["is_live"].as_bool() == Some(true)
         || !v["duration"]
             .as_f64()
@@ -100,21 +101,23 @@ pub fn retrieve(
         "json3",
         "--sub-langs",
         &code,
-        "--sleep-subtitles",
-        "3",
     ]);
     c.arg(if automatic {
         "--write-auto-subs"
     } else {
         "--write-subs"
     });
-    let o = crate::platform::output(c.arg("-o").arg(template).arg("--load-info-json").arg(&info))
+    if cfg!(debug_assertions) {
+        c.arg("--verbose");
+    }
+    let (o, trace) = crate::timing::run(c.arg("-o").arg(template).arg("--load-info-json").arg(&info))
         .map_err(|_| "Cannot retrieve captions")?;
-    crate::diagnostics::log(
+    crate::diagnostics::log_timed(
         crate::diagnostics::Stage::Captions,
         &settings,
         o.status.code(),
         &String::from_utf8_lossy(&o.stderr),
+        &trace,
     );
     if !o.status.success() {
         return Err(format!(
@@ -128,7 +131,7 @@ pub fn retrieve(
         .map(|e| e.path())
         .find(|p| p.extension().is_some_and(|e| e == "json3"))
         .ok_or("No usable subtitle file")?;
-    assemble(&v, &normalized, code, automatic, &path)
+    Ok((assemble(&v, &normalized, code, automatic, &path)?, raw))
 }
 
 /// Turns a downloaded json3 caption file and the video's metadata into the reply sent to the UI.
@@ -272,7 +275,7 @@ mod network_tests {
         let quick = retrieve_quick(url.into(), "en".into(), settings.clone(), cache.clone()).unwrap();
         let quick_time = t.elapsed();
         let t = std::time::Instant::now();
-        let standard = retrieve(url.into(), "en".into(), settings, cache.clone()).unwrap();
+        let standard = retrieve(url.into(), "en".into(), settings, cache.clone()).unwrap().0;
         let standard_time = t.elapsed();
         println!("quick {quick_time:?} vs standard {standard_time:?}");
         let n = |v: &Value| v["track"]["cues"].as_array().unwrap().len();
@@ -289,7 +292,9 @@ mod network_tests {
     fn windows_public_caption_workflow() {
         let cache =
             std::env::temp_dir().join(format!("youglish-caption-smoke-{}", uuid::Uuid::new_v4()));
-        let result = retrieve(
+        let diagnostics = std::env::temp_dir().join(format!("yg-diag-{}", uuid::Uuid::new_v4()));
+        crate::diagnostics::initialize(diagnostics.clone());
+        let (result, _) = retrieve(
             "https://www.youtube.com/watch?v=H14bBuluwB8".into(),
             "en".into(),
             Settings::default(),
@@ -299,5 +304,9 @@ mod network_tests {
         assert!(!result["track"]["cues"].as_array().unwrap().is_empty());
         assert_eq!(std::fs::read_dir(&cache).unwrap().count(), 0);
         std::fs::remove_dir(cache).unwrap();
+        let log = std::fs::read_to_string(diagnostics.join("media.jsonl")).unwrap();
+        println!("{log}");
+        assert!(log.contains("\"duration_ms\""));
+        std::fs::remove_dir_all(diagnostics).unwrap();
     }
 }
