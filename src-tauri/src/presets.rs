@@ -86,13 +86,34 @@ fn valid(name: &str, channels: &Value) -> Result<(), String> {
 pub fn save(dir: &Path, name: &str, channels: Value) -> Result<String, String> {
     valid(name, &channels)?;
     std::fs::create_dir_all(dir).map_err(|_| "Could not create the presets folder.")?;
-    if file_holding(dir, name).is_some() || path_for(dir, name).exists() {
+    // Only the preset's name can clash. Its file name is an implementation detail: when the
+    // obvious file name is taken (by a preset with another name, say after a rename in Finder),
+    // the new preset gets "Name (2).json" instead.
+    if file_holding(dir, name).is_some() {
         return Err(format!(
             "A preset named “{}” already exists. Choose another name.",
             name.trim()
         ));
     }
-    write(dir, name, channels, path_for(dir, name))
+    write(dir, name, channels, free_path(dir, name, None))
+}
+
+/// A file path for a preset of this name that nothing else is using. `own` is a file that may be
+/// reused (the preset's current file, when it is being renamed).
+fn free_path(dir: &Path, name: &str, own: Option<&Path>) -> PathBuf {
+    let first = path_for(dir, name);
+    let usable = |p: &Path| {
+        !p.exists() || own.is_some_and(|o| o.file_name().map(|f| f.to_string_lossy().to_lowercase()) == p.file_name().map(|f| f.to_string_lossy().to_lowercase()))
+    };
+    if usable(&first) {
+        return first;
+    }
+    let stem = file_name(name);
+    let stem = stem.trim_end_matches(".json");
+    (2..100)
+        .map(|n| dir.join(format!("{stem} ({n}).json")))
+        .find(|p| usable(p))
+        .unwrap_or(first)
 }
 
 /// Overwrites the existing preset with this name, after the user has agreed to. The version
@@ -100,9 +121,7 @@ pub fn save(dir: &Path, name: &str, channels: Value) -> Result<String, String> {
 /// mistaken overwrite can be undone by hand.
 pub fn replace(dir: &Path, name: &str, channels: Value) -> Result<String, String> {
     valid(name, &channels)?;
-    let target = file_holding(dir, name)
-        .or_else(|| Some(path_for(dir, name)).filter(|p| p.is_file()))
-        .ok_or("There is no preset with that name to replace.")?;
+    let target = file_holding(dir, name).ok_or("There is no preset with that name to replace.")?;
     std::fs::copy(&target, target.with_extension("json.bak"))
         .map_err(|_| "Could not keep a copy of the old preset.")?;
     write(dir, name, channels, target)
@@ -175,11 +194,11 @@ pub fn rename(dir: &Path, file: &str, new: &str) -> Result<(), String> {
         return Err("Give the preset a name of up to 80 characters.".into());
     }
     let from = existing_path(dir, file)?;
-    let to = path_for(dir, new);
+    let to = free_path(dir, new, Some(&from));
     let same_file = from
         .file_name()
-        .is_some_and(|f| f.to_string_lossy().to_lowercase() == file_name(new).to_lowercase());
-    if !same_file && (to.exists() || file_holding(dir, new).is_some_and(|f| f != from)) {
+        .is_some_and(|f| f.to_string_lossy().to_lowercase() == to.file_name().map(|t| t.to_string_lossy().to_lowercase()).unwrap_or_default());
+    if file_holding(dir, new).is_some_and(|f| f != from) {
         return Err(format!("A preset named “{new}” already exists."));
     }
     let mut value: Value = serde_json::from_str(
@@ -425,6 +444,28 @@ mod tests {
         assert_eq!(list(&dir).len(), 2);
         assert!(rename(&dir, "Missing", "X").is_err());
         assert!(rename(&dir, "Two", "  ").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn a_taken_file_name_never_blocks_a_save_or_a_rename() {
+        let dir = scratch();
+        // The file "Taken.json" holds a preset with a different name.
+        std::fs::write(
+            dir.join("Taken.json"),
+            serde_json::to_string(&json!({ "name": "Other name", "channels": channels() })).unwrap(),
+        )
+        .unwrap();
+        // Saving "Taken" works: only a clash of names counts. The file gets another name.
+        assert_eq!(save(&dir, "Taken", channels()).unwrap(), "Taken (2)");
+        let names: Vec<_> = list(&dir).iter().map(|v| v["name"].as_str().unwrap().to_string()).collect();
+        assert_eq!(names, ["Other name", "Taken"]);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 2);
+        // The same name again is a real clash.
+        assert!(save(&dir, "taken", channels()).is_err());
+        // Renaming onto a name whose file is taken also works; onto a taken name does not.
+        save(&dir, "Plain", channels()).unwrap();
+        rename(&dir, "Plain", "Other name 2").unwrap();
+        assert!(rename(&dir, "Other name 2", "Taken").is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]

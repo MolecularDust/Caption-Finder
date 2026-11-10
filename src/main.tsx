@@ -727,12 +727,22 @@ function App() {
       for (let i = 0; i < 80 && videosRef.current.some((v) => v.loading); i++)
         await new Promise((r) => window.setTimeout(r, 250));
       const list = searchMode === "videos" ? videosRef.current : items;
-      const file = await invoke<string>("save_preset", {
-        name,
-        channels: list.map((c) => ({ ...c, loading: undefined })),
-        kind: searchMode,
-        replace,
-      });
+      let file: string;
+      try {
+        file = await invoke<string>("save_preset", {
+          name,
+          channels: list.map((c) => ({ ...c, loading: undefined })),
+          kind: searchMode,
+          replace,
+        });
+      } catch (e) {
+        // The name is taken by a preset the list hadn't shown yet: offer to replace it too.
+        if (!replace && String(e).includes("already exists")) {
+          setReplaceAsk(name);
+          return;
+        }
+        throw e;
+      }
       showPreset(file);
       setPresetName(null);
       setReplaceAsk(null);
