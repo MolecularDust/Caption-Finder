@@ -44,8 +44,9 @@ const VIDEO_DETAILS_ONLY: [&str; 3] = [
 /// The channel a video belongs to, for suggesting it when someone pastes a video link.
 pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
     let video = crate::model::normalize(url)?;
+    // No VIDEO_DETAILS_ONLY here: with those options yt-dlp leaves channel_id empty on macOS,
+    // and this lookup needs it.
     let mut c = metadata_base(&settings)?;
-    c.args(VIDEO_DETAILS_ONLY);
     c.args([
         "--no-playlist",
         "--skip-download",
