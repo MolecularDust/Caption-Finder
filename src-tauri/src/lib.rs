@@ -1198,7 +1198,7 @@ fn reveal(s: State<Backend>, id: String) -> Result<(), String> {
 /// Use the same persistent, non-incognito webview as the playback test.
 /// Authentication happens on Google's pages; no credentials are read by the app.
 #[tauri::command]
-fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
     show_session_window(
         app,
         url::Url::parse("https://accounts.google.com/").unwrap(),
@@ -1206,7 +1206,7 @@ fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
+async fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
     show_session_window(
         app,
         url::Url::parse("https://www.youtube.com/watch?v=I2xDZlpInik&t=1034s").unwrap(),
@@ -1214,13 +1214,17 @@ fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn youtube_connect_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn youtube_connect_window(app: tauri::AppHandle) -> Result<(), String> {
     show_session_window(
         app,
         url::Url::parse("https://www.youtube.com/signin").unwrap(),
     )
 }
 
+/// Must be called from an async command (or any thread other than the main one). Synchronous
+/// commands run on the main thread, and building a webview there deadlocks on Windows: the
+/// window frame appears but WebView2 never renders and the window ignores close
+/// (https://github.com/tauri-apps/wry/issues/583).
 fn show_session_window(app: tauri::AppHandle, url: url::Url) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("account") {
         window
