@@ -1037,6 +1037,12 @@ function App() {
           ? "waiting"
           : "ready"
         : "";
+  const enterHintLabel =
+    searchMode === "videos"
+      ? "Add this video"
+      : looksLikeChannel(channelText)
+        ? "Add this channel"
+        : "Show matching channels";
   // Switching between searching channels and searching videos starts from a clean slate: the
   // results belong to the old list, and each mode keeps its own list and presets.
   const switchMode = (next: SearchMode) => {
@@ -1444,19 +1450,21 @@ function App() {
                 />
               </label>
               {enterHint && (
-                <span
+                // Clicking does what Enter does in the field. Inside the search form, so it
+                // must not be a submit button; it keeps focus in the field (so the suggestion
+                // list isn't closed by the blur) and stays out of the Tab order, since Enter
+                // already covers keyboard use.
+                <button
+                  type="button"
+                  tabIndex={-1}
                   className={`enter-hint ${enterHint}`}
-                  title={
-                    searchMode === "videos"
-                      ? "Press Enter to add this video"
-                      : looksLikeChannel(channelText)
-                        ? "Press Enter to add this channel"
-                        : "Press Enter to show matching channels"
-                  }
-                  aria-hidden="true"
+                  aria-label={enterHintLabel}
+                  title={`${enterHintLabel} (Enter)`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={submitChannelText}
                 >
                   ↵
-                </span>
+                </button>
               )}
               {searchMode === "videos" && channelNote && (
                 <p className="field-note" role="status">

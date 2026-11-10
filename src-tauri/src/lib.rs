@@ -58,9 +58,20 @@ fn auth(c: &mut std::process::Command, s: &Settings) -> Result<(), String> {
     }
     Ok(())
 }
-/// yt-dlp command shared by lookups and downloads. Requests are not artificially delayed;
-/// the queue's cooldown spaces consecutive downloads instead.
+/// yt-dlp command for fetching media: format analysis, previews and downloads. Requests are
+/// not artificially delayed; the queue's cooldown spaces consecutive downloads instead.
 fn base(s: &Settings) -> Result<std::process::Command, String> {
+    yt_dlp(s, true)
+}
+/// yt-dlp command for listings and metadata: the channel-field lookups, channel pages, and the
+/// caption metadata and subtitle files a search reads. Same as `base`, but on yt-dlp's default
+/// HTTP handler, which reuses connections. The legacy handler opens a new connection per
+/// request; through a local Windows proxy each one cost about 5 s, so one video's caption
+/// metadata took ~23 s instead of ~5 s, with identical output.
+fn metadata_base(s: &Settings) -> Result<std::process::Command, String> {
+    yt_dlp(s, false)
+}
+fn yt_dlp(s: &Settings, legacy_http: bool) -> Result<std::process::Command, String> {
     let mut c = platform::command("yt-dlp")?;
     c.args([
         "--ignore-config",
@@ -74,9 +85,10 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
         "0",
         "--extractor-retries",
         "0",
-        "--compat-options",
-        "prefer-legacy-http-handler",
     ]);
+    if legacy_http {
+        c.args(["--compat-options", "prefer-legacy-http-handler"]);
+    }
     if let Ok(p) = platform::binary("ffmpeg") {
         c.arg("--ffmpeg-location").arg(p.parent().unwrap());
     }
@@ -1198,7 +1210,7 @@ fn reveal(s: State<Backend>, id: String) -> Result<(), String> {
 /// Use the same persistent, non-incognito webview as the playback test.
 /// Authentication happens on Google's pages; no credentials are read by the app.
 #[tauri::command]
-fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
     show_session_window(
         app,
         url::Url::parse("https://accounts.google.com/").unwrap(),
@@ -1206,7 +1218,7 @@ fn youtube_sign_in_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
+async fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
     show_session_window(
         app,
         url::Url::parse("https://www.youtube.com/watch?v=I2xDZlpInik&t=1034s").unwrap(),
@@ -1214,13 +1226,17 @@ fn youtube_playback_test(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn youtube_connect_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn youtube_connect_window(app: tauri::AppHandle) -> Result<(), String> {
     show_session_window(
         app,
         url::Url::parse("https://www.youtube.com/signin").unwrap(),
     )
 }
 
+/// Must be called from an async command (or any thread other than the main one). Synchronous
+/// commands run on the main thread, and building a webview there deadlocks on Windows: the
+/// window frame appears but WebView2 never renders and the window ignores close
+/// (https://github.com/tauri-apps/wry/issues/583).
 fn show_session_window(app: tauri::AppHandle, url: url::Url) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("account") {
         window
@@ -1465,6 +1481,31 @@ mod error_tests {
         assert!(!a.iter().any(|x| x == "--cookies-from-browser"));
         assert_eq!(&b[..a.len()], a.as_slice());
         assert_eq!(&b[a.len()..], ["--cookies-from-browser", "edge"]);
+    }
+    #[test]
+    fn only_metadata_requests_leave_the_legacy_http_handler() {
+        let args = |c: std::process::Command| {
+            c.get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        };
+        let settings = Settings {
+            browser: "edge".into(),
+            ..Default::default()
+        };
+        let full = args(base(&settings).unwrap());
+        let metadata = args(metadata_base(&settings).unwrap());
+        let legacy = ["--compat-options", "prefer-legacy-http-handler"];
+        let n = full
+            .windows(2)
+            .position(|w| w == legacy)
+            .expect("analysis, previews and downloads keep the legacy HTTP handler");
+        // Metadata requests get exactly the same command minus that one option, authentication
+        // included.
+        let mut expected = full.clone();
+        expected.drain(n..n + 2);
+        assert_eq!(metadata, expected);
+        assert!(!metadata.iter().any(|a| a == "prefer-legacy-http-handler"));
     }
     #[test]
     fn requests_are_not_artificially_delayed() {
