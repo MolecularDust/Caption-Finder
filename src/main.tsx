@@ -55,6 +55,8 @@ import { ResultsList, Highlight } from "./results";
 import GrantHelper from "./GrantHelper";
 import "./style.css";
 import appIcon from "./assets/app-icon.png";
+// Windows-only hint: Chromium browsers lock their cookie file while running.
+const isWindows = navigator.userAgent.includes("Windows");
 const RESULT_SLOTS = 25;
 const DEFAULT_SCAN = 50;
 const MAX_SCAN = 1000;
@@ -2818,6 +2820,14 @@ function App() {
                 <option value="file">Import Netscape cookies…</option>
               </select>
             </Field>
+            {isWindows && settings.browser !== "app" && (
+              <p className="notice">
+                On Windows, Chromium-based browsers (Chrome, Edge, Opera, Brave,
+                Vivaldi) lock their cookie file while running, so reading it
+                often fails. “App’s YouTube session” is the reliable choice:
+                sign in above, then select it here.
+              </p>
+            )}
             {browserAccess === "blocked" && (
               <div
                 className="notice error access-notice"
