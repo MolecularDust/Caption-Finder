@@ -68,7 +68,22 @@ Windows media processes use Job Objects with kill-on-close ownership. Processes 
 
 Windows resolves `.exe` media tools next to the app, bundled certificates under resources, and common per-user and system browser executable locations. Completed files are revealed in Explorer. macOS keeps Unix process groups and Finder reveal. Filename validation also rejects Windows reserved device names and invalid characters.
 
-## Optional installer
+## Setup program: regular install or portable copy
+
+```powershell
+npm run package:windows-installer
+```
+
+Output: `dist-installer/Caption-Finder-Setup_<version>_x64.exe`. It ships exactly the files of the portable ZIP (both are staged by `scripts/windows-payload.mjs`) and asks which way to set up:
+
+- **Install normally:** per user, no administrator rights. Files go to `%LOCALAPPDATA%\Programs\Caption Finder`, with a Start menu shortcut and an entry in Apps & features. Settings and sign-in data use the normal per-user profile folders, which uninstalling leaves in place.
+- **Portable:** copies the program into a folder you choose (default: `Caption Finder Portable` beside the setup file) and writes `portable.marker`, so settings and caches stay in `Data` next to the program. Nothing is added to the Start menu or the registry. If the chosen folder already holds other files, the copy goes into a `Caption Finder` subfolder instead.
+
+Silent installs: `Setup.exe /S` installs normally (it always uses the fixed folder above and ignores `/D=`). `Setup.exe /S /PORTABLE=1 /D=<folder>` makes a portable copy in exactly that folder, with `/D=` last and unquoted. A running copy of the app blocks installing over it; the setup asks you to close it, or stops when silent.
+
+The setup needs NSIS. Tauri downloads it to `%LOCALAPPDATA%\tauri\NSIS` the first time `npm run package:windows` runs, so run that once on a new machine. The setup is unsigned, and like the other Windows builds, it can trigger reputation prompts. It never installs WebView2; Windows 11 includes it.
+
+## Tauri's own installer
 
 ```powershell
 npm run package:windows
