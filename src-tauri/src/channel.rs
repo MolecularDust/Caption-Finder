@@ -60,6 +60,57 @@ pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
     })
 }
 
+/// A video's title, channel and length, for listing it when someone adds it to a search.
+pub fn video_info(settings: Settings, url: &str) -> Result<Value, String> {
+    let video = crate::model::normalize(url)?;
+    let mut c = base(&settings)?;
+    c.args([
+        "--no-playlist",
+        "--skip-download",
+        "--print",
+        "%(id)s\t%(title)s\t%(channel)s\t%(duration)s",
+        "--",
+        &video,
+    ]);
+    let o = run_lookup(&mut c).map_err(|_| "Cannot start yt-dlp")?;
+    let stderr = String::from_utf8_lossy(&o.stderr).into_owned();
+    crate::diagnostics::log(
+        crate::diagnostics::Stage::ChannelList,
+        &settings,
+        o.status.code(),
+        &stderr,
+    );
+    parse_video_info(&String::from_utf8_lossy(&o.stdout), &video).ok_or_else(|| {
+        let lower = stderr.to_lowercase();
+        if lower.contains("unavailable") || lower.contains("private") {
+            "That video is unavailable.".to_string()
+        } else if stderr.trim().is_empty() {
+            "Couldn’t read that video.".to_string()
+        } else {
+            safe_error(&stderr)
+        }
+    })
+}
+
+fn parse_video_info(output: &str, source: &str) -> Option<Value> {
+    let line = output.lines().find(|l| l.contains('\t'))?;
+    let mut parts = line.split('\t');
+    let id = parts.next()?.trim();
+    let title = parts.next()?.trim();
+    let channel = parts.next().unwrap_or("").trim();
+    let duration = parts.next().and_then(|d| d.trim().parse::<f64>().ok());
+    if id.len() != 11 || title.is_empty() || title == "NA" {
+        return None;
+    }
+    Some(json!({
+        "id": id,
+        "source": source,
+        "title": title,
+        "channel": (channel != "NA" && !channel.is_empty()).then_some(channel),
+        "duration": duration,
+    }))
+}
+
 fn parse_video_channel(output: &str) -> Option<Value> {
     let line = output.lines().find(|l| l.contains('\t'))?;
     let mut parts = line.split('\t');
@@ -332,6 +383,20 @@ mod video_channel_tests {
         assert_eq!(v["title"], "TED");
         assert_eq!(v["handle"], "@TED");
         assert_eq!(v["subscribers"], 27900000);
+    }
+    #[test]
+    fn reads_a_video_info_line() {
+        let src = "https://www.youtube.com/watch?v=SDSzIs9K_Sg";
+        let v = super::parse_video_info("SDSzIs9K_Sg\tA title\tSome channel\t1234\n", src).unwrap();
+        assert_eq!(v["id"], "SDSzIs9K_Sg");
+        assert_eq!(v["title"], "A title");
+        assert_eq!(v["channel"], "Some channel");
+        assert_eq!(v["duration"], 1234.0);
+        assert_eq!(v["source"], src);
+        let sparse = super::parse_video_info("SDSzIs9K_Sg\tA title\tNA\tNA", src).unwrap();
+        assert!(sparse["channel"].is_null() && sparse["duration"].is_null());
+        assert!(super::parse_video_info("short\tx\ty\tz", src).is_none());
+        assert!(super::parse_video_info("", src).is_none());
     }
     #[test]
     fn copes_with_missing_fields_and_rejects_junk() {

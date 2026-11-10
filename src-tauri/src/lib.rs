@@ -242,28 +242,85 @@ async fn caption_track(
     }
     Ok(value)
 }
-fn presets_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(presets::folder(&app.path().data_dir().map_err(|_| "Cannot locate the data folder")?))
+/// `kind` is "videos" for presets of videos; anything else (or none) means channels.
+fn presets_dir(app: &tauri::AppHandle, kind: &Option<String>) -> Result<PathBuf, String> {
+    let data = app.path().data_dir().map_err(|_| "Cannot locate the data folder")?;
+    // Channel presets used to live directly in "Presets"; bring any such files along.
+    presets::migrate_legacy(&data);
+    Ok(presets::folder(&data, kind.as_deref().unwrap_or("channels")))
 }
 #[tauri::command]
-fn list_presets(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
-    Ok(presets::list(&presets_dir(&app)?))
+fn list_presets(app: tauri::AppHandle, kind: Option<String>) -> Result<Vec<serde_json::Value>, String> {
+    Ok(presets::list(&presets_dir(&app, &kind)?))
 }
 #[tauri::command]
-fn save_preset(app: tauri::AppHandle, name: String, channels: serde_json::Value) -> Result<(), String> {
-    presets::save(&presets_dir(&app)?, &name, channels)
+fn save_preset(
+    app: tauri::AppHandle,
+    name: String,
+    channels: serde_json::Value,
+    kind: Option<String>,
+    replace: Option<bool>,
+) -> Result<String, String> {
+    let dir = presets_dir(&app, &kind)?;
+    if replace == Some(true) {
+        presets::replace(&dir, &name, channels)
+    } else {
+        presets::save(&dir, &name, channels)
+    }
 }
 #[tauri::command]
-fn rename_preset(app: tauri::AppHandle, old: String, new: String) -> Result<(), String> {
-    presets::rename(&presets_dir(&app)?, &old, &new)
+fn rename_preset(
+    app: tauri::AppHandle,
+    file: String,
+    new: String,
+    kind: Option<String>,
+) -> Result<(), String> {
+    presets::rename(&presets_dir(&app, &kind)?, &file, &new)
+}
+/// Opens the folder holding this kind of preset in the file manager, creating it if needed.
+#[tauri::command]
+fn show_presets_folder(app: tauri::AppHandle, kind: Option<String>) -> Result<(), String> {
+    let dir = presets_dir(&app, &kind)?;
+    std::fs::create_dir_all(&dir).map_err(|_| "Could not create the presets folder.")?;
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("/usr/bin/open")
+        .arg(&dir)
+        .spawn()
+        .map_err(|_| "Could not open Finder")?;
+    #[cfg(windows)]
+    std::process::Command::new("explorer.exe")
+        .arg(&dir)
+        .spawn()
+        .map_err(|_| "Could not open the file manager")?;
+    #[cfg(not(any(target_os = "macos", windows)))]
+    return Err("Showing files is not implemented for this platform".into());
+    Ok(())
+}
+/// Asks for a preset file and brings it into the presets of this kind. `None` if cancelled.
+#[tauri::command]
+async fn import_preset(
+    app: tauri::AppHandle,
+    kind: Option<String>,
+) -> Result<Option<serde_json::Value>, String> {
+    let dir = presets_dir(&app, &kind)?;
+    // Start in the presets folder, where saved presets are, rather than wherever the system
+    // last looked.
+    let _ = std::fs::create_dir_all(&dir);
+    let Some(file) = rfd::AsyncFileDialog::new()
+        .set_directory(&dir)
+        .set_title("Load a preset file")
+        .add_filter("Preset", &["json"])
+        .pick_file()
+        .await
+    else {
+        return Ok(None);
+    };
+    let kind = kind.unwrap_or_default();
+    presets::import(&dir, file.path(), &kind).map(Some)
 }
 #[tauri::command]
-fn delete_preset(app: tauri::AppHandle, name: String) -> Result<(), String> {
-    presets::delete(&presets_dir(&app)?, &name)
-}
-#[tauri::command]
-fn reveal_preset(app: tauri::AppHandle, name: String) -> Result<(), String> {
-    let path = presets::existing_path(&presets_dir(&app)?, &name)?;
+fn reveal_preset(app: tauri::AppHandle, file: String, kind: Option<String>) -> Result<(), String> {
+    let path = presets::existing_path(&presets_dir(&app, &kind)?, &file)?;
     #[cfg(target_os = "macos")]
     std::process::Command::new("/usr/bin/open")
         .arg("-R")
@@ -290,6 +347,18 @@ async fn channel_of_video(
     tauri::async_runtime::spawn_blocking(move || channel::of_video(settings, &url))
         .await
         .map_err(|_| "Channel worker stopped".to_string())?
+}
+#[tauri::command]
+async fn video_info(
+    app: tauri::AppHandle,
+    url: String,
+    s: State<'_, Backend>,
+) -> Result<serde_json::Value, String> {
+    let settings = s.settings.lock().unwrap().clone();
+    let settings = session::prepare(&app, settings)?;
+    tauri::async_runtime::spawn_blocking(move || channel::video_info(settings, &url))
+        .await
+        .map_err(|_| "Video worker stopped".to_string())?
 }
 #[tauri::command]
 fn cancel_channel_lookups() {
@@ -1312,12 +1381,14 @@ pub fn run() {
             list_channel,
             find_channels,
             channel_of_video,
+            video_info,
             cancel_channel_lookups,
             list_presets,
             save_preset,
-            delete_preset,
+            show_presets_folder,
             rename_preset,
             reveal_preset,
+            import_preset,
             caption_track,
             enqueue,
             jobs,

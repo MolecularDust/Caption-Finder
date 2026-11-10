@@ -1,14 +1,26 @@
 import type { ChannelEntry } from "./search";
 
 export type ChannelChoice = {
-  /** What yt-dlp is given: a channel link, @handle or UC id. */
+  /** What yt-dlp is given: a channel link, @handle or UC id (or a video link in video mode). */
   source: string;
   title: string;
   subscribers?: number;
   thumbnail?: string;
+  /** Video mode: the channel the video is on, and its length in seconds. */
+  channel?: string;
+  duration?: number;
+  /** Video mode: the title and channel are still being looked up. */
+  loading?: boolean;
 };
 
-export type ChannelPreset = { name: string; channels: ChannelChoice[] };
+export type SearchMode = "channels" | "videos";
+
+export type ChannelPreset = {
+  name: string;
+  channels: ChannelChoice[];
+  /** The preset's file name (without .json): how the backend finds it. */
+  file?: string;
+};
 
 export type ChannelSuggestion = {
   id: string;
@@ -23,6 +35,22 @@ export const isVideoLink = (text: string) =>
   /^(https?:\/\/)?((www|m)\.)?(youtube\.com\/(watch\?([^#]*&)?v=|shorts\/)|youtu\.be\/)[\w-]{11}/i.test(
     text.trim(),
   );
+
+/** Every video link in the text (links may be separated by spaces, commas or lines), once each. */
+export function parseVideoLinks(text: string): { id: string; source: string }[] {
+  const found = new Map<string, string>();
+  const pattern =
+    /(?:https?:\/\/)?(?:(?:www|m)\.)?(?:youtube\.com\/(?:watch\?(?:[^\s#]*&)?v=|shorts\/)|youtu\.be\/)([\w-]{11})/gi;
+  for (const m of text.matchAll(pattern))
+    if (!found.has(m[1])) found.set(m[1], `https://www.youtube.com/watch?v=${m[1]}`);
+  return [...found].map(([id, source]) => ({ id, source }));
+}
+
+/** The videos themselves as a stream, in the order given, for searching a fixed list. */
+export function videoLister(videos: { id: string; source: string }[]) {
+  return async (from: number, count: number): Promise<ChannelEntry[]> =>
+    videos.slice(from - 1, from - 1 + count).map((v) => ({ id: v.id, source: v.source }));
+}
 
 /** True for text that names one channel directly rather than something to look up. */
 export const looksLikeChannel = (text: string) =>

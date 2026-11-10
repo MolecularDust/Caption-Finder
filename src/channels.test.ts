@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isVideoLink, looksLikeChannel, mergedLister, subscriberText } from "./channels";
+import {
+  isVideoLink,
+  looksLikeChannel,
+  mergedLister,
+  parseVideoLinks,
+  subscriberText,
+  videoLister,
+} from "./channels";
 
 const ids = (prefix: string, n: number) =>
   Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}` }));
@@ -54,6 +61,27 @@ describe("mixed channels", () => {
   it("carries on with the longer channel when the other runs out", async () => {
     const next = mergedLister(lister({ a: ids("a", 1), b: ids("b", 3) }), ["a", "b"], 10, 30, true);
     expect((await next(1, 10)).map((e) => e.id)).toEqual(["a0", "b0", "b1", "b2"]);
+  });
+});
+
+describe("video lists", () => {
+  it("finds every video link in pasted text, once each, in order", () => {
+    const text = `Look at https://www.youtube.com/watch?v=SDSzIs9K_Sg&t=5s,
+      https://youtu.be/pnmC76FUUiI and https://www.youtube.com/shorts/H14bBuluwB8
+      https://youtu.be/SDSzIs9K_Sg again, plus https://www.youtube.com/@TED`;
+    expect(parseVideoLinks(text)).toEqual([
+      { id: "SDSzIs9K_Sg", source: "https://www.youtube.com/watch?v=SDSzIs9K_Sg" },
+      { id: "pnmC76FUUiI", source: "https://www.youtube.com/watch?v=pnmC76FUUiI" },
+      { id: "H14bBuluwB8", source: "https://www.youtube.com/watch?v=H14bBuluwB8" },
+    ]);
+    expect(parseVideoLinks("no links here")).toEqual([]);
+  });
+  it("streams a fixed list of videos in pages, tagged with their link", async () => {
+    const vids = ["a", "b", "c"].map((x) => ({ id: x.repeat(11), source: `s-${x}` }));
+    const next = videoLister(vids);
+    expect((await next(1, 2)).map((e) => e.source)).toEqual(["s-a", "s-b"]);
+    expect((await next(3, 2)).map((e) => e.id)).toEqual(["c".repeat(11)]);
+    expect(await next(4, 2)).toEqual([]);
   });
 });
 

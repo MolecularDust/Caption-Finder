@@ -1206,6 +1206,8 @@ fieldset.clip-controls:disabled,
   font-size: 11px;
   font-weight: 650;
   margin-bottom: 7px;
+  /* Starts where the text inside the field starts: its 12px padding plus the 1px border. */
+  padding-left: 13px;
 }
 .phrase-group {
   display: flex;
@@ -1765,4 +1767,75 @@ button.attention {
   .enter-hint.waiting {
     animation: none;
   }
+}
+
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+/* Plain title, set like the field titles ("YouTube video", "Search phrase"). */
+.mode-switch .mode-label {
+  font-size: 11px;
+  font-weight: 650;
+  padding-left: 13px;
+}
+.mode-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  background: var(--input);
+}
+.mode-switch button {
+  height: 28px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 13px;
+  box-shadow: none;
+}
+.mode-switch button.active {
+  background: var(--accent);
+  color: #fff;
+}
+.field-note {
+  margin: 6px 2px 0;
+  font-size: 11px;
+  color: #c0392b;
+  overflow-wrap: anywhere;
+}
+.chip .chip-title {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip .chip-channel {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip.loading .chip-title {
+  opacity: 0.55;
+}
+
+.preset-note {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.context-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.context-menu button:disabled:hover {
+  background: transparent;
+  color: inherit;
 }
