@@ -1752,9 +1752,9 @@ button.attention {
   border-radius: 5px;
   background: var(--panel, #fff);
   color: var(--accent);
-  pointer-events: none;
 }
 .enter-hint.waiting {
+  cursor: progress;
   opacity: 0.45;
   animation: enter-wait 1.2s ease-in-out infinite;
 }
