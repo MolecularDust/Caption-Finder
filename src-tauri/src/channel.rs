@@ -1,4 +1,4 @@
-use crate::{base, lookup_base, model::Settings, platform, safe_error};
+use crate::{metadata_base, model::Settings, platform, safe_error};
 use serde_json::{json, Value};
 use std::process::Stdio;
 use std::sync::Mutex;
@@ -44,7 +44,7 @@ const VIDEO_DETAILS_ONLY: [&str; 3] = [
 /// The channel a video belongs to, for suggesting it when someone pastes a video link.
 pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
     let video = crate::model::normalize(url)?;
-    let mut c = lookup_base(&settings)?;
+    let mut c = metadata_base(&settings)?;
     c.args(VIDEO_DETAILS_ONLY);
     c.args([
         "--no-playlist",
@@ -74,7 +74,7 @@ pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
 /// A video's title, channel and length, for listing it when someone adds it to a search.
 pub fn video_info(settings: Settings, url: &str) -> Result<Value, String> {
     let video = crate::model::normalize(url)?;
-    let mut c = lookup_base(&settings)?;
+    let mut c = metadata_base(&settings)?;
     c.args(VIDEO_DETAILS_ONLY);
     c.args([
         "--no-playlist",
@@ -218,7 +218,7 @@ pub fn find(settings: Settings, query: &str) -> Result<Vec<Value>, String> {
         "https://www.youtube.com/results?search_query={}&sp=EgIQAg%3D%3D",
         percent_encode(query)
     );
-    let mut c = lookup_base(&settings)?;
+    let mut c = metadata_base(&settings)?;
     c.args([
         "--flat-playlist",
         "--dump-json",
@@ -266,7 +266,7 @@ pub fn list(settings: Settings, channel: &str, from: u32, count: u32) -> Result<
         return Err("Invalid page request".into());
     }
     let range = format!("{from}-{}", from + count - 1);
-    let mut c = base(&settings)?;
+    let mut c = metadata_base(&settings)?;
     // Later options win, so this page is fetched without the per-request pause that
     // spaces out caption and download requests.
     c.args([

@@ -58,16 +58,17 @@ fn auth(c: &mut std::process::Command, s: &Settings) -> Result<(), String> {
     }
     Ok(())
 }
-/// yt-dlp command shared by captions, analysis and downloads. Requests are not artificially
-/// delayed; the queue's cooldown spaces consecutive downloads instead.
+/// yt-dlp command for fetching media: format analysis, previews and downloads. Requests are
+/// not artificially delayed; the queue's cooldown spaces consecutive downloads instead.
 fn base(s: &Settings) -> Result<std::process::Command, String> {
     yt_dlp(s, true)
 }
-/// yt-dlp command for the quick lookups behind the channel field (a pasted video's channel,
-/// a video's title, channel-name search). Same as `base`, but on yt-dlp's default HTTP handler,
-/// which reuses connections. The legacy handler opens a new connection per request; through a
-/// local Windows proxy each one cost about 5 s, so a lookup took ~24 s instead of ~2.5 s.
-fn lookup_base(s: &Settings) -> Result<std::process::Command, String> {
+/// yt-dlp command for listings and metadata: the channel-field lookups, channel pages, and the
+/// caption metadata and subtitle files a search reads. Same as `base`, but on yt-dlp's default
+/// HTTP handler, which reuses connections. The legacy handler opens a new connection per
+/// request; through a local Windows proxy each one cost about 5 s, so one video's caption
+/// metadata took ~23 s instead of ~5 s, with identical output.
+fn metadata_base(s: &Settings) -> Result<std::process::Command, String> {
     yt_dlp(s, false)
 }
 fn yt_dlp(s: &Settings, legacy_http: bool) -> Result<std::process::Command, String> {
@@ -1482,7 +1483,7 @@ mod error_tests {
         assert_eq!(&b[a.len()..], ["--cookies-from-browser", "edge"]);
     }
     #[test]
-    fn only_lookups_leave_the_legacy_http_handler() {
+    fn only_metadata_requests_leave_the_legacy_http_handler() {
         let args = |c: std::process::Command| {
             c.get_args()
                 .map(|a| a.to_string_lossy().into_owned())
@@ -1493,17 +1494,18 @@ mod error_tests {
             ..Default::default()
         };
         let full = args(base(&settings).unwrap());
-        let lookup = args(lookup_base(&settings).unwrap());
+        let metadata = args(metadata_base(&settings).unwrap());
         let legacy = ["--compat-options", "prefer-legacy-http-handler"];
         let n = full
             .windows(2)
             .position(|w| w == legacy)
-            .expect("captions and downloads keep the legacy HTTP handler");
-        // Lookups get exactly the same command minus that one option, authentication included.
+            .expect("analysis, previews and downloads keep the legacy HTTP handler");
+        // Metadata requests get exactly the same command minus that one option, authentication
+        // included.
         let mut expected = full.clone();
         expected.drain(n..n + 2);
-        assert_eq!(lookup, expected);
-        assert!(!lookup.iter().any(|a| a == "prefer-legacy-http-handler"));
+        assert_eq!(metadata, expected);
+        assert!(!metadata.iter().any(|a| a == "prefer-legacy-http-handler"));
     }
     #[test]
     fn requests_are_not_artificially_delayed() {
