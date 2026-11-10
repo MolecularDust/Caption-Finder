@@ -1,68 +1,113 @@
-# YouGlish Downloader
+# Caption Finder
 
-A desktop fork of TubeCutter for manually finding speech examples with the official YouGlish widget. This project has its own app identifier and preferences.
+Find the moment a phrase is spoken in YouTube videos, pick the take you like, and download the trimmed clip.
 
-## Use
+Type a phrase, point the app at one channel, several channels, or a list of videos, and it scans their captions. Matches fill a list on the left. Pick one and the video loads on the right with In and Out points already set around the line. Adjust them, preview, and download just that part.
 
-Open `src-tauri/target/debug/bundle/macos/YouGlish Downloader.app` after building, or run `npm run desktop` for development.
+Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. macOS (Apple silicon) works today. Windows is next; see [Windows](#windows).
 
-1. Enter a search phrase, language, and optional accent, then Search. English with all accents is the default.
-2. Browse and listen in YouGlish. Its selected sample caption fills File Name and stays there while playback continues.
-3. Edit File Name to a phrase from that video's subtitles. Click **Look Up** or press Enter. Editing or leaving the field does not start a lookup. The button displays a spinner until matching succeeds or fails. This text is also the output filename (the container supplies the extension).
-4. Supplied subtitles are preferred. Only original, untranslated automatic captions are used as fallback. Matching ignores case, punctuation, and apostrophe style; it spans adjacent cues and suppresses overlapping rolling text.
-5. Video selection first defaults In/Out to zero and the full video duration. One lookup match sets In/Out to the containing subtitle segment boundaries, without padding. Multiple matches require choosing an occurrence; no match leaves the existing timings unchanged. These are subtitle boundaries, not word-level acoustic alignment.
-6. Use the matching mini arrows to change either boundary or the length by exactly one second. Reset restores the whole video and clears invalid input text and validation errors. Invalid boundaries are rejected. You can still edit timestamps directly, type a Length (the padded clip length shown in the field; Out is adjusted to match), drag the timeline, or use Preview selection.
-7. Preview selection temporarily switches the widget area to the inherited YouTube player for accurate seeking. Back to YouGlish results returns to browsing. Set In/Set Out require this preview because YouGlish does not expose a documented absolute playhead time.
-8. Download settings are collapsed initially. The default resolution is the highest available at or below 1080p. At download time a 1080p request also permits lower available source resolutions. Other selected resolutions remain exact.
-9. Choose a destination and add the selection to the inherited sequential download queue. Precise Cut, pause/resume/cancel/retry, subtitle embedding, and Finder reveal are retained.
+> Download only content you own or have permission to download.
 
-Account & Settings defaults to anonymous. Installed supported browsers are detected in normal macOS application locations. Selecting one lets yt-dlp read its local cookie store for subtitles/downloads; cookies are not injected into YouGlish or stored in settings. The widget uses its own WebView session. App preferences and queue identity are separate from TubeCutter.
+## Install (macOS)
+
+Get `Caption-Finder-Installer.dmg` from the [latest release](https://github.com/MolecularDust/Caption-Finder/releases) and open it. The window shows the steps:
+
+1. Double-click **Install Caption Finder**.
+2. macOS stops it ("can't be opened"). Click **Done**.
+3. Double-click the blue **Open System Settings** tile, scroll to the bottom of Privacy & Security, and click **Open Anyway**.
+4. Confirm with your password, then click **Continue** and **Install**.
+
+The app is signed ad hoc and is not notarized, so macOS blocks the installer once. An app placed by Installer is not marked as downloaded, so Caption Finder itself opens without a block. Needs macOS 11 or newer on Apple silicon.
+
+## Using it
+
+**Search across** picks the mode.
+
+- **Channels:** type a name and a list of matching channels appears (Enter shows it at once). Click one to add it. A channel link or `@handle` is added directly, and a pasted video link suggests the channel it belongs to. Several channels are searched one after another, or mixed (one video from each in turn); see Account & Settings.
+- **Videos:** paste video links (watch, `youtu.be` or Shorts), one or many. The listed videos are searched in order.
+
+Then type a **Search phrase** and press **Search**. Results appear as they are found, newest first, up to 25 videos. Click one to open it; each shows the matching line and how many matches the video has.
+
+On the right: the player, the matched line, a timeline, **Set In / Set Out** with padding and length, **Precise Cut**, **Preview selection**, and the file name. Choose a download folder and add the selection to the download queue. The queue supports pause, resume, cancel, retry and showing the file in Finder.
+
+**Presets** save a list of channels or videos so you can bring it back. **Save preset** is disabled until the list has something in it. **Load preset** opens the presets folder to pick a file. Each mode has its own presets. Right-click a preset name for Load, Add to current list, Show in Finder, Rename and Remove from list. Right-click empty space for Clear files, Clear presets and Show presets folder. Removing a preset from the row never deletes its file.
+
+### Matching
+
+- Case, punctuation and apostrophe style are ignored. A phrase can span adjacent caption cues.
+- Languages with no spaces (Chinese, Japanese, Thai and similar) match character by character. Arabic and Hebrew vowel marks are ignored.
+- The caption language follows the alphabet of the phrase (a Cyrillic phrase looks for Russian, Ukrainian and similar tracks), or the language each video is spoken in for Latin letters. **Caption language** in settings overrides this, which also reaches the dubbed audio tracks some channels publish.
+- **Search in captions** limits the search to uploaded captions, to YouTube's automatic captions, or either (uploaded preferred). Translations are never used.
+- Boundaries are caption-cue boundaries, not word-level alignment.
+
+### Account & Settings
+
+- **Download authentication:** the app's own YouTube session, the cookies of a browser installed on the Mac (Chrome, Opera, Vivaldi, Firefox and others it detects), or anonymous. Chrome and Firefox cookies need Full Disk Access on macOS; the app opens a small helper window with an icon to drag into System Settings.
+- **Videos to scan per search** (per channel, default 50), **Results from several channels**, **Caption language**, **Search in captions**.
+- **Don't play the first found video automatically**, and **While a video loads** (thumbnail or spinner).
+
+## Where things are kept
+
+| What                                       | macOS location                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------- |
+| Settings (download folder, authentication) | `~/Library/Application Support/com.mike.captionfinder/settings.json`             |
+| Presets                                    | `~/Library/Application Support/Caption Finder/Presets/Channels` and `.../Videos` |
+| The app's own YouTube sign-in              | `~/Library/WebKit/com.mike.captionfinder`                                        |
+
+Presets live outside the app's own folders on purpose: a reset or a reinstall leaves them alone. The app never deletes or overwrites a preset file without asking; replacing one keeps the old version beside it as `<name>.json.bak`.
 
 ## Development
 
-`npm run build`, `npm test`, and `npm run lint` check the frontend. `npm run desktop` launches the native development app. `node scripts/desktop.mjs build --debug --bundles app --config src-tauri/tauri.dev-bundle.conf.json` makes a local evaluation bundle.
-
-The Rust toolchain version is pinned in `rust-toolchain.toml`; `rustup` installs it on first use. The `.app` includes yt-dlp, FFmpeg, FFprobe, Deno, and certificate resources. It is a local development build, not a notarized distribution release. Do not use the upstream release signing instructions or artifact hashes as verification of this fork. See `docs/PHONETIC_FORK_STATUS.md` for actual checks and limitations.
-
-## Integration references
-
-- YouGlish widget API: https://youglish.com/api/doc/js-api
-- YouTube Terms: https://www.youtube.com/t/terms
-- Google Privacy Policy: https://policies.google.com/privacy
-
-YouGlish requires explicit permission for commercial API/widget use. No permission has been obtained or request sent. The widget remains attributed and its built-in controls remain visible. This fork does not automate search-result harvesting or make phonetic selection decisions.
-
-## Working across Mac and Windows
-
-Use GitHub as the shared source repository. Clone it on each computer, pull before starting work, and commit/push when finished. Downloads, cookies, local settings, dependencies, toolchains, and build output are intentionally excluded. Configure your download folder and authentication separately on each machine.
-
-For a fresh checkout:
+Prerequisites: Node.js (24 LTS), Rust (the version is pinned in `rust-toolchain.toml`; `rustup` installs it), and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your system.
 
 ```sh
 npm ci
-npm run build
-npm test
-npm run lint
+node scripts/install-tools.mjs     # fetches the pinned yt-dlp, FFmpeg, FFprobe and Deno
+npm run prepare:sidecars
+npm run desktop                    # development app
 ```
 
-These commands check the shared frontend on either platform. Native builds also require Rust and the operating system dependencies described in [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
-
-On an Apple Silicon Mac, fetch and prepare the pinned media tools before making a native bundle:
+Checks:
 
 ```sh
-node scripts/install-tools.mjs
-npm run prepare:sidecars
-npm run desktop
+npm run build        # type-check and build the frontend
+npm test             # frontend tests
+npm run lint
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Run native unit tests with `cargo test --manifest-path src-tauri/Cargo.toml`. Debug builds fall back to yt-dlp/FFmpeg found on `PATH` and print a warning when they do; release bundles use only the pinned sidecars.
+### Builds on macOS
 
-**Windows:** build the portable ZIP with `npm run package:portable` (Windows 11 x64, system WebView2). It includes all four media tools and uses an application-local Data folder. An optional NSIS installer is available via `npm run package:windows`. See [Windows instructions](docs/WINDOWS.md) for status, tested behavior, and remaining limits. macOS packaging commands remain macOS-only.
+| Command                     | Result                                                                                                                                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run package:dev`       | `Caption Finder Dev.app` in `src-tauri/target/debug/bundle/macos/`. Has its own identity (`com.mike.captionfinder.dev`), so testing it doesn't disturb the main app's settings or permissions. |
+| `npm run package:app`       | `Caption Finder.app` in `src-tauri/target/release/bundle/macos/`.                                                                                                                              |
+| `npm run package:installer` | The installer disk image, in `src-tauri/target/release/bundle/installer/`. Needs the app built first.                                                                                          |
+| `npm run reset:app`         | Lists what a reset would remove; add `--yes` to do it. Clears settings, caches, the app's sign-in and macOS privacy entries for both builds. It does not touch presets.                        |
 
-## Agent collaboration
+Rebuilding an app changes its ad-hoc signature, so macOS forgets its Full Disk Access grant: grant it again after a rebuild.
 
-For concurrent development or an independent review, start with [collaboration instructions](docs/COLLABORATION.md) and [AGENTS.md](AGENTS.md). Each agent uses a separate branch and working folder. Return changes using the [handoff template](docs/HANDOFF_TEMPLATE.md).
+### Layout
 
-## App-session cookies
+- `src/main.tsx` is the interface. `src/search.ts` runs a search (batches, concurrency, rate-limit back-off). `src/channels.ts` and `src/languages.ts` hold the channel and language logic. `src/subtitles.ts` does the matching.
+- `src-tauri/src/channel.rs` lists channel videos and looks up channels. `captions.rs` retrieves captions. `presets.rs` stores presets. `preview.rs` makes the low-resolution local preview. `session.rs` and `browser_access.rs` handle sign-in and cookies. `grant_helper.rs` is the macOS Full Disk Access helper window. `platform.rs` resolves tools and processes per OS.
+- `tools/installer/` builds the macOS installer: an installer package plus a disk image whose window walks through Open Anyway.
 
-With "App’s YouTube session" selected, a Netscape cookie file is written to `sessions/` inside the app’s private cache folder (mode 0600 on macOS) immediately before each Look Up, Analyze or download, and deleted when that yt-dlp run ends. Queued downloads hold no cookie file; they take a fresh snapshot when they start. Files left by a crash or force-quit are removed the next time the app starts, as are stale `.tubecutter-<pid>-*.partial` staging folders in the saved destination. Windows file protection relies on the user-profile folder’s default permissions and has not been tested.
+`docs/DEPENDENCIES.md` lists the third-party tools and their licenses. The other files in `docs/` come from the project this was forked from and still describe it (see [Credits](#credits)).
+
+## Windows
+
+Not done yet. The project inherits Windows packaging from its parent (`tauri.windows.conf.json`, `npm run package:portable`, `npm run package:windows`, and `docs/WINDOWS.md`), but none of it has been run for Caption Finder. What a Windows port needs:
+
+- **macOS-only parts to replace or skip:** the Full Disk Access helper (`grant_helper.rs`) and the browser access check (`browser_access.rs`); the installer in `tools/installer/` (a Windows installer would be NSIS or similar).
+- **Channel lookup cancel:** typing past a lookup stops its yt-dlp process on macOS. On Windows it falls back to letting the lookup finish (`run_lookup` in `channel.rs`).
+- **Presets:** stored in the user data folder (`%APPDATA%\Caption Finder\Presets\...`). A portable build keeps its other data next to the app, so decide where presets should go.
+- **Reveal in file manager:** `reveal_preset` and the Show presets folder action already have Windows branches; they need a test.
+- **Leftover names:** `docs/WINDOWS.md` and the portable ZIP script still use the parent project's names.
+- **Tests to run on Windows:** everything in `cargo test`, then a search, a preview and a download end to end, with and without browser cookies.
+
+## Credits
+
+Caption Finder started as a fork of [YouGlish Downloader](https://github.com/MolecularDust/Youglish-Downloader), itself a fork of TubeCutter. The download queue and much of the packaging come from that work. Third-party tools (yt-dlp, FFmpeg, Deno, and the libraries in the apps) keep their own licenses; see `LICENSES/` and `docs/DEPENDENCIES.md`. The FFmpeg builds used are GPL, so redistributing the app means following those terms.
+
+Licensed under the MIT License; see `LICENSE`. YouTube's [Terms of Service](https://www.youtube.com/t/terms) and [Google's Privacy Policy](https://policies.google.com/privacy) apply to what you do with YouTube content.
