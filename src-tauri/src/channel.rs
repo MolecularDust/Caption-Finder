@@ -1,4 +1,4 @@
-use crate::{base, model::Settings, platform, safe_error};
+use crate::{base, lookup_base, model::Settings, platform, safe_error};
 use serde_json::{json, Value};
 use std::process::Stdio;
 use std::sync::Mutex;
@@ -31,10 +31,21 @@ pub fn cancel_lookups() {
     }
 }
 
+/// For lookups that only need a video's title, length and channel: read them from the watch
+/// page alone, skipping the extra player-API requests and JS challenge that only serve to list
+/// playable formats (three requests and a deno run fewer). With no formats requested, their
+/// absence is not an error.
+const VIDEO_DETAILS_ONLY: [&str; 3] = [
+    "--extractor-args",
+    "youtube:player_skip=configs,js;player_client=web",
+    "--ignore-no-formats-error",
+];
+
 /// The channel a video belongs to, for suggesting it when someone pastes a video link.
 pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
     let video = crate::model::normalize(url)?;
-    let mut c = base(&settings)?;
+    let mut c = lookup_base(&settings)?;
+    c.args(VIDEO_DETAILS_ONLY);
     c.args([
         "--no-playlist",
         "--skip-download",
@@ -63,7 +74,8 @@ pub fn of_video(settings: Settings, url: &str) -> Result<Value, String> {
 /// A video's title, channel and length, for listing it when someone adds it to a search.
 pub fn video_info(settings: Settings, url: &str) -> Result<Value, String> {
     let video = crate::model::normalize(url)?;
-    let mut c = base(&settings)?;
+    let mut c = lookup_base(&settings)?;
+    c.args(VIDEO_DETAILS_ONLY);
     c.args([
         "--no-playlist",
         "--skip-download",
@@ -206,7 +218,7 @@ pub fn find(settings: Settings, query: &str) -> Result<Vec<Value>, String> {
         "https://www.youtube.com/results?search_query={}&sp=EgIQAg%3D%3D",
         percent_encode(query)
     );
-    let mut c = base(&settings)?;
+    let mut c = lookup_base(&settings)?;
     c.args([
         "--flat-playlist",
         "--dump-json",

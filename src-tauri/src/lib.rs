@@ -58,9 +58,19 @@ fn auth(c: &mut std::process::Command, s: &Settings) -> Result<(), String> {
     }
     Ok(())
 }
-/// yt-dlp command shared by lookups and downloads. Requests are not artificially delayed;
-/// the queue's cooldown spaces consecutive downloads instead.
+/// yt-dlp command shared by captions, analysis and downloads. Requests are not artificially
+/// delayed; the queue's cooldown spaces consecutive downloads instead.
 fn base(s: &Settings) -> Result<std::process::Command, String> {
+    yt_dlp(s, true)
+}
+/// yt-dlp command for the quick lookups behind the channel field (a pasted video's channel,
+/// a video's title, channel-name search). Same as `base`, but on yt-dlp's default HTTP handler,
+/// which reuses connections. The legacy handler opens a new connection per request; through a
+/// local Windows proxy each one cost about 5 s, so a lookup took ~24 s instead of ~2.5 s.
+fn lookup_base(s: &Settings) -> Result<std::process::Command, String> {
+    yt_dlp(s, false)
+}
+fn yt_dlp(s: &Settings, legacy_http: bool) -> Result<std::process::Command, String> {
     let mut c = platform::command("yt-dlp")?;
     c.args([
         "--ignore-config",
@@ -74,9 +84,10 @@ fn base(s: &Settings) -> Result<std::process::Command, String> {
         "0",
         "--extractor-retries",
         "0",
-        "--compat-options",
-        "prefer-legacy-http-handler",
     ]);
+    if legacy_http {
+        c.args(["--compat-options", "prefer-legacy-http-handler"]);
+    }
     if let Ok(p) = platform::binary("ffmpeg") {
         c.arg("--ffmpeg-location").arg(p.parent().unwrap());
     }
@@ -1469,6 +1480,30 @@ mod error_tests {
         assert!(!a.iter().any(|x| x == "--cookies-from-browser"));
         assert_eq!(&b[..a.len()], a.as_slice());
         assert_eq!(&b[a.len()..], ["--cookies-from-browser", "edge"]);
+    }
+    #[test]
+    fn only_lookups_leave_the_legacy_http_handler() {
+        let args = |c: std::process::Command| {
+            c.get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        };
+        let settings = Settings {
+            browser: "edge".into(),
+            ..Default::default()
+        };
+        let full = args(base(&settings).unwrap());
+        let lookup = args(lookup_base(&settings).unwrap());
+        let legacy = ["--compat-options", "prefer-legacy-http-handler"];
+        let n = full
+            .windows(2)
+            .position(|w| w == legacy)
+            .expect("captions and downloads keep the legacy HTTP handler");
+        // Lookups get exactly the same command minus that one option, authentication included.
+        let mut expected = full.clone();
+        expected.drain(n..n + 2);
+        assert_eq!(lookup, expected);
+        assert!(!lookup.iter().any(|a| a == "prefer-legacy-http-handler"));
     }
     #[test]
     fn requests_are_not_artificially_delayed() {
