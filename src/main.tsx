@@ -1434,19 +1434,29 @@ function App() {
                 />
               </label>
               {enterHint && (
-                <span
+                <button
+                  type="button"
                   className={`enter-hint ${enterHint}`}
                   title={
                     searchMode === "videos"
-                      ? "Press Enter to add this video"
+                      ? "Add this video (Enter)"
                       : looksLikeChannel(channelText)
-                        ? "Press Enter to add this channel"
-                        : "Press Enter to show matching channels"
+                        ? "Add this channel (Enter)"
+                        : "Show matching channels (Enter)"
                   }
-                  aria-hidden="true"
+                  aria-label={
+                    searchMode === "videos"
+                      ? "Add this video"
+                      : looksLikeChannel(channelText)
+                        ? "Add this channel"
+                        : "Show matching channels"
+                  }
+                  // Keep the field focused so the suggestion list isn't closed by the blur first.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={submitChannelText}
                 >
                   ↵
-                </span>
+                </button>
               )}
               {searchMode === "videos" && channelNote && (
                 <p className="field-note" role="status">

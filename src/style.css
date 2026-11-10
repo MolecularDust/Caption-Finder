@@ -1752,7 +1752,15 @@ button.attention {
   border-radius: 5px;
   background: var(--panel, #fff);
   color: var(--accent);
-  pointer-events: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.enter-hint:hover {
+  border-color: var(--accent);
+}
+.enter-hint:active {
+  border-bottom-width: 1px;
+  transform: translateY(1px);
 }
 .enter-hint.waiting {
   opacity: 0.45;
