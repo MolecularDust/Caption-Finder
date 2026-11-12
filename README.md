@@ -57,9 +57,9 @@ You can also keep **Anonymous**, but YouTube’s anti-bot checks are stricter fo
 
 Then type a **Search phrase** and press **Search**. Results appear as they are found, newest first, up to 25 videos. Click one to open it; each shows the matching line and how many matches the video has.
 
-On the right: the player, the matched line, a timeline, **Set In / Set Out** with padding and length, **Precise Cut**, **Preview selection**, and the file name. Choose a download folder and add the selection to the download queue. The queue supports pause, resume, cancel, retry and showing the file in Finder.
+On the right: the player, the matched line, a timeline, **Set In / Set Out** with padding and length, **Precise Cut**, **Preview selection**, and the file name. Choose a download folder and add the selection to the download queue. The queue supports pause, resume, cancel, retry and **Reveal file**, which shows the finished file in File Explorer on Windows or in Finder on macOS.
 
-**Presets** save a list of channels or videos so you can bring it back. **Save preset** is disabled until the list has something in it. **Load preset** opens the presets folder to pick a file. Each mode has its own presets. Right-click a preset name for Load, Add to current list, Show in Finder, Rename and Remove from list. Right-click empty space for Clear files, Clear presets and Show presets folder. Removing a preset from the row never deletes its file.
+**Presets** save a list of channels or videos so you can bring it back. **Save preset** is disabled until the list has something in it. **Load preset** opens the presets folder to pick a file. Each mode has its own presets. Right-click a preset name for Load, Add to current list, Show in Finder, Rename and Remove from list. Right-click empty space for Clear files, Clear presets and Show presets folder. Removing a preset from the row never deletes its file. On Windows, **Show in Finder** keeps that label but opens File Explorer with the preset file selected, and **Show presets folder** opens the folder in File Explorer.
 
 ### Matching
 
@@ -71,27 +71,39 @@ On the right: the player, the matched line, a timeline, **Set In / Set Out** wit
 
 ### Account & Settings
 
-- **Download authentication:** the app's own YouTube session, the cookies of a browser installed on the Mac (Chrome, Opera, Vivaldi, Firefox and others it detects), or anonymous. Chrome and Firefox cookies need Full Disk Access on macOS; the app opens a small helper window with an icon to drag into System Settings.
+- **Video player account:** **1. Sign in to Google**, **2. Connect YouTube** (choose your channel if asked) and **Check playback** open a separate account window for the player. The login is kept in the app's own browser storage. On YouTube, an account avatar confirms you are signed in, and its account menu switches accounts or signs out. Close the window when you are done and search again to reload the player.
+- **Download authentication:** where caption lookups and downloads get their YouTube sign-in. Choose **Anonymous** (the default), **App's YouTube session**, a browser the app finds on this computer, or **Import Netscape cookies…**. Cookies are never copied into the app's settings.
+  - **Windows:** Chrome, Edge, Firefox, Brave, Chromium, Vivaldi and Opera are detected.
+  - **macOS:** Chrome, Opera, Vivaldi, Firefox, Safari and others are detected.
+- **On Windows:**
+  - Close the browser completely, including its background processes, before you search or download with its cookies. Chromium browsers (Chrome, Edge, Opera, Brave, Vivaldi, Chromium) lock their cookie file while they run. If the app says it could not copy the browser cookie database, this is why.
+  - Chromium's cookie encryption on Windows can still stop the extraction, and the app never bypasses it. Use **App's YouTube session** or **Import Netscape cookies…** instead.
+  - The app passes the system's manual HTTP proxy (without a user name or password) on to yt-dlp, and honours `HTTP_PROXY` and `HTTPS_PROXY`. A PAC script or a bypass list with entries other than local addresses is not forwarded.
+  - The download folder and an imported cookies file are saved as full paths. If a portable copy moves to a different drive letter, choose them again.
+  - Pausing a download suspends its process, so a long pause can let YouTube drop the connection. Pause and resume do not carry over a restart of the app.
+  - There is no Full Disk Access on Windows, so the macOS helper window below never appears.
+- **On macOS:** Chrome and Firefox cookies need Full Disk Access; the app opens a small helper window with an icon to drag into System Settings.
+- **File names** that Windows cannot save (reserved names such as `CON` or `NUL`, and characters such as `? * | < >`) are rejected on every platform, so a clip can move between the two.
 - **Videos to scan per search** (per channel, default 50), **Results from several channels**, **Caption language**, **Search in captions**.
 - **Don't play the first found video automatically**, and **While a video loads** (thumbnail or spinner).
 
 ## Where things are kept
 
-| What | macOS | Windows (normal install) |
+| What | Windows (normal install) | macOS |
 | --- | --- | --- |
-| Settings (download folder, authentication) | `~/Library/Application Support/com.mike.captionfinder/settings.json` | `%APPDATA%\com.mike.captionfinder\settings.json` |
-| Presets | `~/Library/Application Support/Caption Finder/Presets/Channels` and `.../Videos` | `%APPDATA%\Caption Finder\Presets\Channels` and `...\Videos` |
-| The app's own YouTube sign-in | `~/Library/WebKit/com.mike.captionfinder` | `%LOCALAPPDATA%\com.mike.captionfinder\EBWebView` |
+| Settings (download folder, authentication) | `%APPDATA%\com.mike.captionfinder\settings.json` | `~/Library/Application Support/com.mike.captionfinder/settings.json` |
+| Presets | `%APPDATA%\Caption Finder\Presets\Channels` and `...\Videos` | `~/Library/Application Support/Caption Finder/Presets/Channels` and `.../Videos` |
+| The app's own YouTube sign-in | `%LOCALAPPDATA%\com.mike.captionfinder\EBWebView` | `~/Library/WebKit/com.mike.captionfinder` |
 
-A portable copy (the portable ZIP, or the setup's **Portable** option) keeps its settings, sign-in and caches in a `Data` folder beside `Caption Finder.exe`. Its presets still go to `%APPDATA%\Caption Finder\Presets`.
+On Windows, caches and the media log (`logs\media.jsonl`, which holds only safe diagnostic codes) are also under `%LOCALAPPDATA%\com.mike.captionfinder`. A portable copy (the portable ZIP, or the setup's **Portable** option) keeps its settings, sign-in and caches in a `Data` folder beside `Caption Finder.exe`, with the log in `Data\Diagnostics`. Its presets still go to `%APPDATA%\Caption Finder\Presets`. Move a portable folder only while the app is closed.
 
 Presets live outside the app's own folders on purpose: a reset or a reinstall leaves them alone. The app never deletes or overwrites a preset file without asking; replacing one keeps the old version beside it as `<name>.json.bak`.
 
 ## Development
 
-Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. macOS (Apple silicon) and Windows 11 (x64) both work; see [Windows](#windows).
+Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. Windows 11 (x64) and macOS (Apple silicon) both work; see [Windows](#windows).
 
-Prerequisites: Node.js (24 LTS), Rust (the version is pinned in `rust-toolchain.toml`; `rustup` installs it), and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your system.
+Prerequisites: Node.js (24 LTS), Rust (the version is pinned in `rust-toolchain.toml`; `rustup` installs it), and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your system. On Windows that means the Visual Studio C++ Build Tools (the Desktop development with C++ workload) and the WebView2 runtime.
 
 ```sh
 npm ci
@@ -109,6 +121,16 @@ npm run lint
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+### Builds on Windows
+
+| Command | Result |
+| --- | --- |
+| `npm run package:windows-installer` | The setup, `dist-installer/Caption-Finder-Setup_<version>_x64.exe`: install normally or make a portable copy. Needs NSIS, which Tauri downloads the first time `npm run package:windows` runs. |
+| `npm run package:portable` | The portable ZIP, `dist-portable/Caption-Finder-Windows-Portable.zip`. |
+| `npm run package:windows` | Tauri's own NSIS installer, in `src-tauri/target/release/bundle/nsis/`. It installs normally only, with no portable choice. |
+
+The builds are not signed. Windows locks a program while it runs, so close Caption Finder before building or packaging, or the build cannot replace `caption-finder.exe`. See `docs/WINDOWS.md` for the details.
+
 ### Builds on macOS
 
 | Command                     | Result                                                                                                                                                                                         |
@@ -124,18 +146,14 @@ Rebuilding an app changes its ad-hoc signature, so macOS forgets its Full Disk A
 
 - `src/main.tsx` is the interface. `src/search.ts` runs a search (batches, concurrency, rate-limit back-off). `src/channels.ts` and `src/languages.ts` hold the channel and language logic. `src/subtitles.ts` does the matching.
 - `src-tauri/src/channel.rs` lists channel videos and looks up channels. `captions.rs` retrieves captions. `presets.rs` stores presets. `preview.rs` makes the low-resolution local preview. `session.rs` and `browser_access.rs` handle sign-in and cookies. `grant_helper.rs` is the macOS Full Disk Access helper window. `platform.rs` resolves tools and processes per OS.
+- `scripts/installer/CaptionFinderSetup.nsi` and `scripts/package-windows-installer.mjs` build the Windows setup. `scripts/windows-payload.mjs` stages the files that the setup and the portable ZIP share.
 - `tools/installer/` builds the macOS installer: an installer package plus a disk image whose window walks through Open Anyway.
 
 `docs/DEPENDENCIES.md` lists the third-party tools and their licenses. The other files in `docs/` come from the project this was forked from and still describe it (see [Credits](#credits)).
 
 ## Windows
 
-Windows 11 (x64) works, with unsigned builds. Two ways to package it, both described in `docs/WINDOWS.md`:
-
-- `npm run package:windows-installer` builds a setup program (`dist-installer/`) that asks whether to install normally (per user, Start menu shortcut, Apps & features entry) or to make a portable copy in a folder you choose.
-- `npm run package:portable` builds the same app as a ZIP (`dist-portable/`).
-
-Both are built from the same staged files and need Node.js, Rust (the pinned toolchain), the Visual Studio C++ Build Tools and the system WebView2 runtime. Windows may show a reputation prompt, because the builds are not signed.
+Windows 11 (x64) works, with unsigned builds. See [Builds on Windows](#builds-on-windows) for the commands and `docs/WINDOWS.md` for the details. The setup and the portable ZIP are built from the same staged files. Windows may show a reputation prompt, because the builds are not signed.
 
 **Tested on Windows 11 x64:** the YouTube sign-in window, channel lookup from a pasted video link, caption search, `cargo test`, and the setup (portable and regular installs, refusal while the app is running, upgrade, uninstall).
 
@@ -143,7 +161,7 @@ Both are built from the same staged files and need Node.js, Rust (the pinned too
 
 - **Signed-in use and downloads:** a search with the app's YouTube session or browser cookies, then a preview and a download end to end. Previews, downloads and format analysis still use yt-dlp's legacy HTTP handler, which is slow behind a local proxy; lookups and caption search use the default one.
 - **macOS-only parts:** the Full Disk Access helper (`grant_helper.rs`) and the browser access check (`browser_access.rs`) do nothing on Windows and leave unused-code warnings.
-- **Channel lookup cancel:** typing past a lookup stops its yt-dlp process on macOS. On Windows it lets the lookup finish (`run_lookup` in `channel.rs`).
+- **Channel lookup cancel:** on Windows, typing past a lookup lets it finish; on macOS it stops the lookup's yt-dlp process (`run_lookup` in `channel.rs`).
 - **Presets:** stored in the user data folder (`%APPDATA%\Caption Finder\Presets\...`). A portable copy keeps its other data next to the app, so decide where presets should go.
 - **Reveal in file manager:** `reveal_preset` and the Show presets folder action have Windows branches that have not been tested.
 - **Leftover names:** `docs/WINDOWS.md` still uses the parent project's names in places.
