@@ -4,8 +4,6 @@ Find the moment a phrase is spoken in YouTube videos, pick the take you like, an
 
 Type a phrase, point the app at one channel, several channels, or a list of videos, and it scans their captions. Matches fill a list on the left. Pick one and the video loads on the right with In and Out points already set around the line. Adjust them, preview, and download just that part.
 
-Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. macOS (Apple silicon) and Windows 11 (x64) both work; see [Windows](#windows).
-
 > Download only content you own or have permission to download.
 
 ## Install (macOS)
@@ -57,6 +55,8 @@ On the right: the player, the matched line, a timeline, **Set In / Set Out** wit
 Presets live outside the app's own folders on purpose: a reset or a reinstall leaves them alone. The app never deletes or overwrites a preset file without asking; replacing one keeps the old version beside it as `<name>.json.bak`.
 
 ## Development
+
+Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. macOS (Apple silicon) and Windows 11 (x64) both work; see [Windows](#windows).
 
 Prerequisites: Node.js (24 LTS), Rust (the version is pinned in `rust-toolchain.toml`; `rustup` installs it), and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your system.
 
