@@ -4,7 +4,7 @@ Find the moment a phrase is spoken in YouTube videos, pick the take you like, an
 
 Type a phrase, point the app at one channel, several channels, or a list of videos, and it scans their captions. Matches fill a list on the left. Pick one and the video loads on the right with In and Out points already set around the line. Adjust them, preview, and download just that part.
 
-Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. macOS (Apple silicon) works today. Windows is next; see [Windows](#windows).
+Caption Finder is a [Tauri](https://tauri.app) desktop app (React and TypeScript in the window, Rust behind it) that drives [yt-dlp](https://github.com/yt-dlp/yt-dlp) and FFmpeg. macOS (Apple silicon) and Windows 11 (x64) both work; see [Windows](#windows).
 
 > Download only content you own or have permission to download.
 
@@ -97,14 +97,23 @@ Rebuilding an app changes its ad-hoc signature, so macOS forgets its Full Disk A
 
 ## Windows
 
-Not done yet. The project inherits Windows packaging from its parent (`tauri.windows.conf.json`, `npm run package:portable`, `npm run package:windows`, and `docs/WINDOWS.md`), but none of it has been run for Caption Finder. What a Windows port needs:
+Windows 11 (x64) works, with unsigned builds. Two ways to package it, both described in `docs/WINDOWS.md`:
 
-- **macOS-only parts to replace or skip:** the Full Disk Access helper (`grant_helper.rs`) and the browser access check (`browser_access.rs`); the installer in `tools/installer/` (a Windows installer would be NSIS or similar).
-- **Channel lookup cancel:** typing past a lookup stops its yt-dlp process on macOS. On Windows it falls back to letting the lookup finish (`run_lookup` in `channel.rs`).
-- **Presets:** stored in the user data folder (`%APPDATA%\Caption Finder\Presets\...`). A portable build keeps its other data next to the app, so decide where presets should go.
-- **Reveal in file manager:** `reveal_preset` and the Show presets folder action already have Windows branches; they need a test.
-- **Leftover names:** `docs/WINDOWS.md` and the portable ZIP script still use the parent project's names.
-- **Tests to run on Windows:** everything in `cargo test`, then a search, a preview and a download end to end, with and without browser cookies.
+- `npm run package:windows-installer` builds a setup program (`dist-installer/`) that asks whether to install normally (per user, Start menu shortcut, Apps & features entry) or to make a portable copy in a folder you choose.
+- `npm run package:portable` builds the same app as a ZIP (`dist-portable/`).
+
+Both are built from the same staged files and need Node.js, Rust (the pinned toolchain), the Visual Studio C++ Build Tools and the system WebView2 runtime. Windows may show a reputation prompt, because the builds are not signed.
+
+**Tested on Windows 11 x64:** the YouTube sign-in window, channel lookup from a pasted video link, caption search, `cargo test`, and the setup (portable and regular installs, refusal while the app is running, upgrade, uninstall).
+
+**Still to check or finish:**
+
+- **Signed-in use and downloads:** a search with the app's YouTube session or browser cookies, then a preview and a download end to end. Previews, downloads and format analysis still use yt-dlp's legacy HTTP handler, which is slow behind a local proxy; lookups and caption search use the default one.
+- **macOS-only parts:** the Full Disk Access helper (`grant_helper.rs`) and the browser access check (`browser_access.rs`) do nothing on Windows and leave unused-code warnings.
+- **Channel lookup cancel:** typing past a lookup stops its yt-dlp process on macOS. On Windows it lets the lookup finish (`run_lookup` in `channel.rs`).
+- **Presets:** stored in the user data folder (`%APPDATA%\Caption Finder\Presets\...`). A portable copy keeps its other data next to the app, so decide where presets should go.
+- **Reveal in file manager:** `reveal_preset` and the Show presets folder action have Windows branches that have not been tested.
+- **Leftover names:** `docs/WINDOWS.md` still uses the parent project's names in places.
 
 ## Credits
 

@@ -1,4 +1,4 @@
-use crate::{base, model::Settings, safe_error};
+use crate::{metadata_base, model::Settings, safe_error};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 struct TempDir(PathBuf);
@@ -95,7 +95,9 @@ pub fn retrieve(
     if !valid_languages(&language) {
         return Err("Unsupported caption language code".into());
     }
-    let mut c = base(&settings)?;
+    // Full extraction, formats included: the caller caches this metadata so a later preview or
+    // download of the video can reuse it. Only the HTTP handler differs from a download.
+    let mut c = metadata_base(&settings)?;
     if cfg!(debug_assertions) {
         c.arg("--verbose"); // development builds only: makes yt-dlp print its phases for timing
     }
@@ -145,7 +147,7 @@ pub fn retrieve(
     )
     .map_err(|_| "Cannot save temporary metadata")?;
     let template = dir.0.join("captions.%(ext)s");
-    let mut c = base(&settings)?;
+    let mut c = metadata_base(&settings)?;
     c.args([
         "--skip-download",
         "--sub-format",

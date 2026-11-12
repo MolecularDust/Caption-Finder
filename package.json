@@ -18,6 +18,7 @@
     "package:installer": "bash tools/installer/make_installer.sh",
     "package:dev": "npm run prepare:sidecars && node scripts/desktop.mjs build --debug --bundles app --config src-tauri/tauri.dev-bundle.conf.json && node scripts/embed-yt-dlp.mjs \"src-tauri/target/debug/bundle/macos/Caption Finder Dev.app\" --reseal",
     "package:portable": "node scripts/package-windows-portable.mjs",
+    "package:windows-installer": "node scripts/package-windows-installer.mjs",
     "package:windows": "npm run prepare:sidecars && node scripts/desktop.mjs build --bundles nsis --config src-tauri/tauri.windows.conf.json"
   },
   "dependencies": {
