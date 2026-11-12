@@ -1,0 +1,159 @@
+<!-- languages:start -->
+<div align="center">
+
+<details>
+<summary><b>🌐 Language · Idioma · Langue · Sprache · Язык · 语言 · 言語 · 언어 · भाषा · لغة</b></summary>
+<br>
+
+<table>
+  <tr>
+    <td align="center"><a href="../../README.md">English</a></td>
+    <td align="center"><b>العربية</b></td>
+    <td align="center"><a href="README.bn.md">বাংলা</a></td>
+    <td align="center"><a href="README.zh-Hans.md">简体中文</a></td>
+    <td align="center"><a href="README.fil.md">Filipino</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="README.fr.md">Français</a></td>
+    <td align="center"><a href="README.de.md">Deutsch</a></td>
+    <td align="center"><a href="README.hi.md">हिन्दी</a></td>
+    <td align="center"><a href="README.id.md">Bahasa Indonesia</a></td>
+    <td align="center"><a href="README.it.md">Italiano</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="README.ja.md">日本語</a></td>
+    <td align="center"><a href="README.ko.md">한국어</a></td>
+    <td align="center"><a href="README.fa.md">فارسی</a></td>
+    <td align="center"><a href="README.pt-BR.md">Português (Brasil)</a></td>
+    <td align="center"><a href="README.ru.md">Русский</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="README.es.md">Español</a></td>
+    <td align="center"><a href="README.te.md">తెలుగు</a></td>
+    <td align="center"><a href="README.th.md">ไทย</a></td>
+    <td align="center"><a href="README.tr.md">Türkçe</a></td>
+    <td align="center"><a href="README.vi.md">Tiếng Việt</a></td>
+  </tr>
+</table>
+
+</details>
+
+</div>
+<!-- languages:end -->
+
+<div dir="rtl">
+
+# Caption Finder
+
+> كُتبت هذه الترجمة بواسطة الذكاء الاصطناعي ولم يراجعها ناطقون أصليون. التطبيق نفسه بالإنجليزية، لذلك تبقى أسماء الأزرار والقوائم بالإنجليزية. عند أي شك، المرجع هو [ملف README بالإنجليزية](../../README.md).
+
+اعثر على اللحظة التي تُقال فيها عبارة ما في مقاطع فيديو يوتيوب، واختر المقطع الذي يعجبك، ثم نزّل المقطع المقصوص.
+
+اكتب عبارة، ووجّه التطبيق إلى قناة واحدة أو عدة قنوات أو قائمة فيديوهات، فيفحص ترجماتها النصية (الترجمة المصاحبة). تملأ النتائج المطابقة قائمة على اليسار. اختر واحدة فيُحمَّل الفيديو على اليمين مع نقطتَي البداية والنهاية مضبوطتين مسبقًا حول السطر. اضبطهما، وشاهد المعاينة، ثم نزّل ذلك الجزء فقط.
+
+<p align="center">
+  <img src="../screenshot.webp" alt="Caption Finder يعرض الفيديوهات المطابقة للعبارة “download”، مع الفيديو المحدد وأجزاء الترجمة النصية المطابقة" width="420">
+</p>
+
+> نزّل فقط المحتوى الذي تملكه أو لديك إذن بتنزيله.
+
+## التثبيت (Windows)
+
+احصل على برنامج الإعداد من [صفحة الإصدارات](https://github.com/MolecularDust/Caption-Finder/releases): `Caption-Finder-Setup_<version>_x64.exe`. يتطلب Windows 11 على حاسوب x64. بيئة WebView2 التي يستخدمها التطبيق مضمّنة في Windows 11.
+
+1. أغلق Caption Finder إن كان يعمل.
+2. انقر نقرًا مزدوجًا على برنامج الإعداد. قد يحذّرك Windows من أن التطبيق من ناشر غير معروف لأنه غير موقّع رقميًا. انقر **مزيد من المعلومات** (More info) ثم **تشغيل على أي حال** (Run anyway).
+3. اختر أحد الخيارين:
+   - **Install normally:** يثبّت التطبيق لحساب المستخدم الخاص بك دون صلاحيات المسؤول. يضيف اختصارًا في قائمة Start وإدخالًا في قائمة التطبيقات المثبّتة (Apps & features).
+   - **Portable:** ينسخ التطبيق إلى مجلد تختاره، مثل محرك USB. لا يُضاف شيء إلى قائمة Start أو السجل (registry)، وتبقى الإعدادات في مجلد `Data` بجوار التطبيق.
+4. انقر **Install** ثم **Finish**.
+
+لإزالة التثبيت العادي، استخدم قائمة التطبيقات المثبّتة (Apps & features). تبقى إعداداتك وبيانات تسجيل الدخول في ملف المستخدم الخاص بك.
+
+يمكنك أيضًا تنزيل `Caption-Finder-Windows-Portable.zip` من الصفحة نفسها. استخرج ملف ZIP بالكامل إلى مجلد أولًا، ثم شغّل `Caption Finder.exe`. لا تشغّله من داخل ملف ZIP.
+
+## التثبيت (macOS)
+
+احصل على `Caption-Finder-Installer.dmg` من [أحدث إصدار](https://github.com/MolecularDust/Caption-Finder/releases) وافتحه. تعرض النافذة الخطوات:
+
+1. انقر نقرًا مزدوجًا على **Install Caption Finder**.
+2. يوقفه macOS (“لا يمكن فتحه”). انقر **تم** (Done).
+3. انقر نقرًا مزدوجًا على المربع الأزرق **Open System Settings**، ثم مرّر إلى أسفل **الخصوصية والأمان** (Privacy & Security) في **إعدادات النظام** (System Settings)، وانقر **فتح على أي حال** (Open Anyway).
+4. أكّد بكلمة المرور الخاصة بك، ثم انقر **متابعة** (Continue) و**تثبيت** (Install).
+
+التطبيق موقّع توقيعًا مؤقتًا (ad hoc) وغير موثّق (notarized)، لذلك يمنع macOS برنامج التثبيت مرة واحدة. التطبيق الذي يضعه المثبّت لا يُعلَّم على أنه منزَّل، لذا يفتح Caption Finder نفسه دون منع. يتطلب macOS 11 أو أحدث على معالجات Apple silicon.
+
+## إعداد الوصول إلى يوتيوب
+
+1. ثبّت Caption Finder وافتح **Account & Settings**.
+2. تحت **Video player account** انقر **1. Sign in to Google** ثم **2. Connect YouTube**، واختر قناتك إن طُلب منك ذلك. أغلق نافذة الحساب عند الانتهاء.
+3. تحت **Download authentication** اختر **App’s YouTube session**.
+
+أنت الآن جاهز لاستخدام Caption Finder.
+
+لاستخدام متصفح سجّلت الدخول إليه بالفعل بدلًا من ذلك، اخترْه تحت **Download authentication**. على Windows أغلق ذلك المتصفح قبل البحث: تقفل متصفحات Chromium ملف ملفات تعريف الارتباط (الكوكيز) الخاص بها أثناء عملها، لذا فإن جلسة التطبيق نفسه هي الخيار الموثوق هناك. على macOS لا تحتاج إلى إغلاق المتصفح. استخدم حسابك أنت فقط. لا تستورد ولا تشارك ملفات تعريف الارتباط الخاصة بأي شخص آخر.
+
+يمكنك أيضًا إبقاء **Anonymous**، لكن فحوصات يوتيوب المضادة للروبوتات أشد صرامة مع الوصول المجهول، وستفشل بعض الفيديوهات.
+
+## طريقة الاستخدام
+
+**Search across** يختار الوضع.
+
+- **Channels:** اكتب اسمًا فتظهر قائمة بالقنوات المطابقة (يعرضها Enter فورًا). انقر على واحدة لإضافتها. تُضاف روابط القنوات أو `@handle` مباشرةً، ويقترح رابط الفيديو الملصوق القناة التي ينتمي إليها. تُبحث عدة قنوات واحدة تلو الأخرى، أو بالتناوب (فيديو واحد من كل قناة بالدور)؛ راجع Account & Settings.
+- **Videos:** ألصق روابط فيديو (watch أو `youtu.be` أو Shorts)، رابطًا واحدًا أو أكثر. تُبحث الفيديوهات المدرجة بالترتيب.
+
+ثم اكتب **Search phrase** واضغط **Search**. تظهر النتائج فور العثور عليها، الأحدث أولًا، حتى 25 فيديو. انقر على واحدة لفتحها؛ تعرض كل نتيجة السطر المطابق وعدد المطابقات في الفيديو.
+
+على اليمين: المشغّل، والسطر المطابق، وخط زمني، و**Set In / Set Out** مع الهامش والمدة، و**Precise Cut**، و**Preview selection**، واسم الملف. اختر مجلد التنزيل وأضف التحديد إلى قائمة انتظار التنزيل. تدعم قائمة الانتظار الإيقاف المؤقت والاستئناف والإلغاء وإعادة المحاولة و**Reveal file**، الذي يعرض الملف المكتمل في مستكشف الملفات على Windows أو في Finder على macOS.
+
+**Presets** تحفظ قائمة قنوات أو فيديوهات لتستعيدها لاحقًا. يكون **Save preset** معطّلًا ما دامت القائمة فارغة. **Load preset** يفتح مجلد الإعدادات المسبقة لاختيار ملف. لكل وضع إعداداته المسبقة الخاصة. انقر بزر الفأرة الأيمن على اسم إعداد مسبق: Load وAdd to current list وShow in Finder وRename وRemove from list. انقر بالزر الأيمن على مساحة فارغة: Clear files وClear presets وShow presets folder. إزالة إعداد مسبق من الصف لا تحذف ملفه أبدًا. على Windows يحتفظ **Show in Finder** بهذا الاسم لكنه يفتح مستكشف الملفات مع تحديد ملف الإعداد المسبق، ويفتح **Show presets folder** المجلد في مستكشف الملفات.
+
+### المطابقة
+
+- يُتجاهل اختلاف حالة الأحرف وعلامات الترقيم وشكل الفاصلة العليا. يمكن للعبارة أن تمتد عبر أجزاء ترجمة نصية متجاورة.
+- اللغات التي لا تفصل الكلمات بمسافات (الصينية واليابانية والتايلاندية وما شابهها) تُطابَق حرفًا بحرف. تُتجاهل علامات التشكيل في العربية والعبرية.
+- تتبع لغة الترجمة النصية أبجدية العبارة (العبارة بالأحرف السيريلية تبحث عن مسارات روسية وأوكرانية وما شابهها)، أو اللغة المنطوقة في كل فيديو بالنسبة للأحرف اللاتينية. يتجاوز **Caption language** في الإعدادات ذلك، وهو يصل أيضًا إلى المسارات الصوتية المدبلجة التي تنشرها بعض القنوات.
+- **Search in captions** يقصر البحث على الترجمات المرفوعة، أو الترجمات التلقائية من يوتيوب، أو أيٍّ منهما (مع تفضيل المرفوعة). لا تُستخدم الترجمات إلى لغة أخرى أبدًا.
+- الحدود هي حدود أجزاء الترجمة النصية، وليست محاذاة على مستوى الكلمة.
+
+### Account & Settings
+
+- **Video player account:** يفتح **1. Sign in to Google** و**2. Connect YouTube** (اختر قناتك إن طُلب) و**Check playback** نافذة حساب منفصلة للمشغّل. يُحفظ تسجيل الدخول في تخزين المتصفح الخاص بالتطبيق. على يوتيوب تؤكد صورة الحساب أنك مسجّل الدخول، وتتيح قائمة الحساب تبديل الحسابات أو تسجيل الخروج. أغلق النافذة عند الانتهاء وابحث مجددًا لإعادة تحميل المشغّل.
+- **Download authentication:** من أين تحصل استعلامات الترجمة النصية والتنزيلات على تسجيل الدخول إلى يوتيوب. اختر **Anonymous** (الافتراضي) أو **App's YouTube session** أو متصفحًا يجده التطبيق على هذا الحاسوب أو **Import Netscape cookies…**. لا تُنسخ ملفات تعريف الارتباط إلى إعدادات التطبيق أبدًا.
+  - **Windows:** يُكتشف Chrome وEdge وFirefox وBrave وChromium وVivaldi وOpera.
+  - **macOS:** يُكتشف Chrome وOpera وVivaldi وFirefox وSafari وغيرها.
+- **على Windows:**
+  - أغلق المتصفح تمامًا، بما في ذلك عملياته في الخلفية، قبل البحث أو التنزيل بملفات تعريف الارتباط الخاصة به. تقفل متصفحات Chromium (Chrome وEdge وOpera وBrave وVivaldi وChromium) ملف الكوكيز أثناء عملها. إذا ذكر التطبيق أنه تعذّر نسخ قاعدة بيانات ملفات تعريف الارتباط للمتصفح، فهذا هو السبب.
+  - قد يمنع تشفير ملفات تعريف الارتباط في Chromium على Windows الاستخراج مع ذلك، ولا يتجاوزه التطبيق أبدًا. استخدم **App's YouTube session** أو **Import Netscape cookies…** بدلًا من ذلك.
+  - يمرّر التطبيق وكيل HTTP اليدوي للنظام (دون اسم مستخدم وكلمة مرور) إلى yt-dlp، ويحترم `HTTP_PROXY` و`HTTPS_PROXY`. لا يُمرَّر سكربت PAC ولا قائمة استثناءات تحتوي على عناوين غير محلية.
+  - يُحفظ مجلد التنزيل وملف ملفات تعريف الارتباط المستورد كمسارات كاملة. إذا انتقلت نسخة محمولة إلى حرف محرك أقراص آخر، فاخترهما من جديد.
+  - إيقاف التنزيل مؤقتًا يعلّق عمليته، لذا قد يؤدي الإيقاف الطويل إلى أن يقطع يوتيوب الاتصال. لا يبقى الإيقاف المؤقت والاستئناف بعد إعادة تشغيل التطبيق.
+  - لا يوجد «الوصول الكامل إلى القرص» (Full Disk Access) على Windows، لذا لا تظهر هناك نافذة المساعدة الخاصة بـ macOS المذكورة أدناه.
+- **على macOS:** تحتاج ملفات تعريف الارتباط لـ Chrome وFirefox إلى **الوصول الكامل إلى القرص** (Full Disk Access)؛ يفتح التطبيق نافذة مساعدة صغيرة فيها أيقونة تُسحب إلى إعدادات النظام (System Settings).
+- **أسماء الملفات** التي لا يستطيع Windows حفظها (الأسماء المحجوزة مثل `CON` أو `NUL`، والأحرف مثل `? * | < >`) تُرفض على كل المنصات، حتى يمكن نقل المقطع بين النظامين.
+- **Videos to scan per search** (لكل قناة، الافتراضي 50)، **Results from several channels**، **Caption language**، **Search in captions**.
+- **Don't play the first found video automatically**، و**While a video loads** (صورة مصغّرة أو مؤشر تحميل).
+
+## أين تُحفظ الأشياء
+
+| ماذا | Windows (التثبيت العادي) | macOS |
+| --- | --- | --- |
+| الإعدادات (مجلد التنزيل، المصادقة) | `%APPDATA%\com.mike.captionfinder\settings.json` | `~/Library/Application Support/com.mike.captionfinder/settings.json` |
+| الإعدادات المسبقة | `%APPDATA%\Caption Finder\Presets\Channels` و`...\Videos` | `~/Library/Application Support/Caption Finder/Presets/Channels` و`.../Videos` |
+| تسجيل دخول التطبيق الخاص إلى يوتيوب | `%LOCALAPPDATA%\com.mike.captionfinder\EBWebView` | `~/Library/WebKit/com.mike.captionfinder` |
+
+على Windows توجد أيضًا ذاكرات التخزين المؤقت وسجل الوسائط (`logs\media.jsonl`، ويحتوي رموز تشخيص آمنة فقط) تحت `%LOCALAPPDATA%\com.mike.captionfinder`. تحتفظ النسخة المحمولة (ملف ZIP المحمول، أو خيار **Portable** في برنامج الإعداد) بإعداداتها وتسجيل دخولها وذاكراتها المؤقتة في مجلد `Data` بجوار `Caption Finder.exe`، ويكون السجل في `Data\Diagnostics`. وتبقى إعداداتها المسبقة في `%APPDATA%\Caption Finder\Presets`. انقل المجلد المحمول فقط والتطبيق مغلق.
+
+تُحفظ الإعدادات المسبقة عمدًا خارج مجلدات التطبيق نفسه: لا تمسّها إعادة الضبط أو إعادة التثبيت. لا يحذف التطبيق ملف إعداد مسبق ولا يستبدله دون أن يسأل؛ واستبدال ملف يُبقي النسخة القديمة بجانبه باسم `<name>.json.bak`.
+
+## التطوير وبناء Windows
+
+ملاحظات التطوير (المتطلبات، وعمليات البناء لـ Windows وmacOS، وهيكل الشيفرة) وحالة بناء Windows موجودة فقط في [ملف README بالإنجليزية](../../README.md#development).
+
+## الشكر والتقدير
+
+بدأ Caption Finder كنسخة متفرّعة (fork) من [YouGlish Downloader](https://github.com/MolecularDust/Youglish-Downloader)، وهو نفسه نسخة متفرّعة من TubeCutter. تأتي قائمة انتظار التنزيل وجزء كبير من التغليف من ذلك العمل. تحتفظ الأدوات التابعة لجهات خارجية (yt-dlp وFFmpeg وDeno والمكتبات داخل التطبيقات) برخصها الخاصة؛ راجع `LICENSES/` و`docs/DEPENDENCIES.md`. إصدارات FFmpeg المستخدمة بترخيص GPL، لذا فإعادة توزيع التطبيق تعني الالتزام بتلك الشروط.
+
+مرخّص بموجب ترخيص MIT؛ راجع `LICENSE`. تنطبق [شروط خدمة](https://www.youtube.com/t/terms) يوتيوب و[سياسة خصوصية Google](https://policies.google.com/privacy) على ما تفعله بمحتوى يوتيوب.
+
+</div>

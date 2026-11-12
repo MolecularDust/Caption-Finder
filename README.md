@@ -1,3 +1,46 @@
+<!-- languages:start -->
+<div align="center">
+
+<details>
+<summary><b>🌐 Language · Idioma · Langue · Sprache · Язык · 语言 · 言語 · 언어 · भाषा · لغة</b></summary>
+<br>
+
+<table>
+  <tr>
+    <td align="center"><b>English</b></td>
+    <td align="center"><a href="docs/i18n/README.ar.md">العربية</a></td>
+    <td align="center"><a href="docs/i18n/README.bn.md">বাংলা</a></td>
+    <td align="center"><a href="docs/i18n/README.zh-Hans.md">简体中文</a></td>
+    <td align="center"><a href="docs/i18n/README.fil.md">Filipino</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/i18n/README.fr.md">Français</a></td>
+    <td align="center"><a href="docs/i18n/README.de.md">Deutsch</a></td>
+    <td align="center"><a href="docs/i18n/README.hi.md">हिन्दी</a></td>
+    <td align="center"><a href="docs/i18n/README.id.md">Bahasa Indonesia</a></td>
+    <td align="center"><a href="docs/i18n/README.it.md">Italiano</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/i18n/README.ja.md">日本語</a></td>
+    <td align="center"><a href="docs/i18n/README.ko.md">한국어</a></td>
+    <td align="center"><a href="docs/i18n/README.fa.md">فارسی</a></td>
+    <td align="center"><a href="docs/i18n/README.pt-BR.md">Português (Brasil)</a></td>
+    <td align="center"><a href="docs/i18n/README.ru.md">Русский</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/i18n/README.es.md">Español</a></td>
+    <td align="center"><a href="docs/i18n/README.te.md">తెలుగు</a></td>
+    <td align="center"><a href="docs/i18n/README.th.md">ไทย</a></td>
+    <td align="center"><a href="docs/i18n/README.tr.md">Türkçe</a></td>
+    <td align="center"><a href="docs/i18n/README.vi.md">Tiếng Việt</a></td>
+  </tr>
+</table>
+
+</details>
+
+</div>
+<!-- languages:end -->
+
 # Caption Finder
 
 Find the moment a phrase is spoken in YouTube videos, pick the take you like, and download the trimmed clip.
@@ -148,6 +191,11 @@ Rebuilding an app changes its ad-hoc signature, so macOS forgets its Full Disk A
 - `src-tauri/src/channel.rs` lists channel videos and looks up channels. `captions.rs` retrieves captions. `presets.rs` stores presets. `preview.rs` makes the low-resolution local preview. `session.rs` and `browser_access.rs` handle sign-in and cookies. `grant_helper.rs` is the macOS Full Disk Access helper window. `platform.rs` resolves tools and processes per OS.
 - `scripts/installer/CaptionFinderSetup.nsi` and `scripts/package-windows-installer.mjs` build the Windows setup. `scripts/windows-payload.mjs` stages the files that the setup and the portable ZIP share.
 - `tools/installer/` builds the macOS installer: an installer package plus a disk image whose window walks through Open Anyway.
+- `docs/i18n/` holds this README in 19 other languages (the same ones as HomePad). `scripts/readme-languages.mjs` keeps the language chooser at the top of every page in sync, and `node scripts/readme-languages.mjs --check` verifies that each translation still has the same commands, file names, links and structure as this page. The Development section stays English-only.
+
+### Translating the README
+
+The translations were written by an AI and have not been reviewed by native speakers. The app itself is English-only, so button and menu names stay in English in every translation, and Windows and macOS's own labels are translated with the English in brackets. To add a language, add a row to `LANGUAGES` in `scripts/readme-languages.mjs`, write `docs/i18n/README.<code>.md` with the two `<!-- languages:... -->` markers at the top (copy another language's file as the template), then run `node scripts/readme-languages.mjs` and `node scripts/readme-languages.mjs --check`. When this README's user-facing sections change, update the translations too; the check reports what has drifted.
 
 `docs/DEPENDENCIES.md` lists the third-party tools and their licenses. The other files in `docs/` come from the project this was forked from and still describe it (see [Credits](#credits)).
 
