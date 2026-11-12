@@ -77,11 +77,13 @@ On the right: the player, the matched line, a timeline, **Set In / Set Out** wit
 
 ## Where things are kept
 
-| What                                       | macOS location                                                                   |
-| ------------------------------------------ | -------------------------------------------------------------------------------- |
-| Settings (download folder, authentication) | `~/Library/Application Support/com.mike.captionfinder/settings.json`             |
-| Presets                                    | `~/Library/Application Support/Caption Finder/Presets/Channels` and `.../Videos` |
-| The app's own YouTube sign-in              | `~/Library/WebKit/com.mike.captionfinder`                                        |
+| What | macOS | Windows (normal install) |
+| --- | --- | --- |
+| Settings (download folder, authentication) | `~/Library/Application Support/com.mike.captionfinder/settings.json` | `%APPDATA%\com.mike.captionfinder\settings.json` |
+| Presets | `~/Library/Application Support/Caption Finder/Presets/Channels` and `.../Videos` | `%APPDATA%\Caption Finder\Presets\Channels` and `...\Videos` |
+| The app's own YouTube sign-in | `~/Library/WebKit/com.mike.captionfinder` | `%LOCALAPPDATA%\com.mike.captionfinder\EBWebView` |
+
+A portable copy (the portable ZIP, or the setup's **Portable** option) keeps its settings, sign-in and caches in a `Data` folder beside `Caption Finder.exe`. Its presets still go to `%APPDATA%\Caption Finder\Presets`.
 
 Presets live outside the app's own folders on purpose: a reset or a reinstall leaves them alone. The app never deletes or overwrites a preset file without asking; replacing one keeps the old version beside it as `<name>.json.bak`.
 
