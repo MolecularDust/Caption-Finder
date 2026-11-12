@@ -10,6 +10,21 @@ Type a phrase, point the app at one channel, several channels, or a list of vide
 
 > Download only content you own or have permission to download.
 
+## Install (Windows)
+
+Get the setup from the [releases page](https://github.com/MolecularDust/Caption-Finder/releases): `Caption-Finder-Setup_<version>_x64.exe`. It needs Windows 11 on an x64 PC. The WebView2 runtime that the app uses is included in Windows 11.
+
+1. Close Caption Finder if it is running.
+2. Double-click the setup. Windows may warn that the app is from an unknown publisher, because it is not code-signed. Click **More info**, then **Run anyway**.
+3. Choose one option:
+   - **Install normally:** installs for your user account with no administrator rights. Adds a Start menu shortcut and an entry in Apps & features.
+   - **Portable:** copies the app into a folder you choose, such as a USB drive. Nothing is added to the Start menu or the registry, and settings stay in a `Data` folder next to the app.
+4. Click **Install**, then **Finish**.
+
+To uninstall a normal install, use **Apps & features**. Your settings and sign-in data stay in your user profile.
+
+You can also download `Caption-Finder-Windows-Portable.zip` from the same page. Extract the whole ZIP to a folder first, then run `Caption Finder.exe`. Do not run it from inside the ZIP.
+
 ## Install (macOS)
 
 Get `Caption-Finder-Installer.dmg` from the [latest release](https://github.com/MolecularDust/Caption-Finder/releases) and open it. The window shows the steps:
