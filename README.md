@@ -4,6 +4,10 @@ Find the moment a phrase is spoken in YouTube videos, pick the take you like, an
 
 Type a phrase, point the app at one channel, several channels, or a list of videos, and it scans their captions. Matches fill a list on the left. Pick one and the video loads on the right with In and Out points already set around the line. Adjust them, preview, and download just that part.
 
+<p align="center">
+  <img src="docs/screenshot.webp" alt="Caption Finder listing videos that match the phrase download, with the selected video loaded and its matching caption segments" width="420">
+</p>
+
 > Download only content you own or have permission to download.
 
 ## Install (macOS)
