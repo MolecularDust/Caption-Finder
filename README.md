@@ -44,7 +44,7 @@ The app is signed ad hoc and is not notarized, so macOS blocks the installer onc
 
 You’re ready to use Caption Finder.
 
-To use a browser you already have signed in to instead, choose it under **Download authentication**. On Windows, close that browser before you search: Chromium browsers lock their cookie file while they run, so the app’s own session is the reliable choice there. Only use your own account. Do not import or share anyone else’s cookies.
+To use a browser you already have signed in to instead, choose it under **Download authentication**. On Windows, close that browser before you search: Chromium browsers lock their cookie file while they run, so the app’s own session is the reliable choice there. On macOS you do not need to close the browser. Only use your own account. Do not import or share anyone else’s cookies.
 
 You can also keep **Anonymous**, but YouTube’s anti-bot checks are stricter for anonymous access, and some videos will fail.
 
