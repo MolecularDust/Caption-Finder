@@ -21,6 +21,18 @@ Get `Caption-Finder-Installer.dmg` from the [latest release](https://github.com/
 
 The app is signed ad hoc and is not notarized, so macOS blocks the installer once. An app placed by Installer is not marked as downloaded, so Caption Finder itself opens without a block. Needs macOS 11 or newer on Apple silicon.
 
+## Set up YouTube access
+
+1. Install Caption Finder and open **Account & Settings**.
+2. Under **Video player account**, click **1. Sign in to Google**, then **2. Connect YouTube**, and choose your channel if asked. Close the account window when you’re done.
+3. Under **Download authentication**, choose **App’s YouTube session**.
+
+You’re ready to use Caption Finder.
+
+To use a browser you already have signed in to instead, choose it under **Download authentication**. On Windows, close that browser before you search: Chromium browsers lock their cookie file while they run, so the app’s own session is the reliable choice there. Only use your own account. Do not import or share anyone else’s cookies.
+
+You can also keep **Anonymous**, but YouTube’s anti-bot checks are stricter for anonymous access, and some videos will fail.
+
 ## Using it
 
 **Search across** picks the mode.
