@@ -43,7 +43,7 @@
 
 # Caption Finder
 
-> Questa traduzione è stata scritta da un’IA e non è stata rivista da madrelingua. L’app stessa è in inglese, quindi i nomi di pulsanti e menu restano in inglese. In caso di dubbio, fa fede il [README in inglese](../../README.md).
+> Questa traduzione è stata scritta da un’IA e non è stata rivista da madrelingua. L’app è disponibile anche in questa lingua, e i nomi di pulsanti e menu sono riportati qui come li mostra l’app (la lingua si cambia in Account & Settings → Language). In caso di dubbio, fa fede il [README in inglese](../../README.md).
 
 Trova il momento in cui una frase viene pronunciata nei video di YouTube, scegli la ripresa che preferisci e scarica la clip ritagliata.
 
@@ -83,54 +83,54 @@ L’app è firmata ad hoc e non è notarizzata, quindi macOS blocca il programma
 
 ## Configurare l’accesso a YouTube
 
-1. Installa Caption Finder e apri **Account & Settings**.
-2. Sotto **Video player account**, fai clic su **1. Sign in to Google**, poi su **2. Connect YouTube**, e scegli il tuo canale se richiesto. Chiudi la finestra dell’account quando hai finito.
-3. Sotto **Download authentication**, scegli **App’s YouTube session**.
+1. Installa Caption Finder e apri **Account e impostazioni**.
+2. Sotto **Account del lettore video**, fai clic su **1. Sign in to Google**, poi su **2. Connect YouTube**, e scegli il tuo canale se richiesto. Chiudi la finestra dell’account quando hai finito.
+3. Sotto **Autenticazione dei download**, scegli **Sessione YouTube dell’app**.
 
 Sei pronto a usare Caption Finder.
 
-Per usare invece un browser in cui hai già effettuato l’accesso, sceglilo sotto **Download authentication**. Su Windows, chiudi quel browser prima di cercare: i browser Chromium bloccano il file dei cookie finché sono in esecuzione, quindi la sessione propria dell’app è la scelta affidabile. Su macOS non serve chiudere il browser. Usa solo il tuo account. Non importare né condividere i cookie di altri.
+Per usare invece un browser in cui hai già effettuato l’accesso, sceglilo sotto **Autenticazione dei download**. Su Windows, chiudi quel browser prima di cercare: i browser Chromium bloccano il file dei cookie finché sono in esecuzione, quindi la sessione propria dell’app è la scelta affidabile. Su macOS non serve chiudere il browser. Usa solo il tuo account. Non importare né condividere i cookie di altri.
 
-Puoi anche lasciare **Anonymous**, ma i controlli anti-bot di YouTube sono più severi per l’accesso anonimo e alcuni video non funzioneranno.
+Puoi anche lasciare **Anonimo**, ma i controlli anti-bot di YouTube sono più severi per l’accesso anonimo e alcuni video non funzioneranno.
 
 ## Come si usa
 
-**Search across** sceglie la modalità.
+**Cerca in** sceglie la modalità.
 
 - **Channels:** digita un nome e compare un elenco di canali corrispondenti (Invio lo mostra subito). Fai clic su uno per aggiungerlo. Un link di canale o un `@handle` viene aggiunto direttamente, e un link di video incollato suggerisce il canale a cui appartiene. Più canali vengono cercati uno dopo l’altro, oppure mescolati (un video da ciascuno a turno); vedi Account & Settings.
 - **Videos:** incolla link di video (watch, `youtu.be` o Shorts), uno o molti. I video in elenco vengono cercati in ordine.
 
-Poi digita una **Search phrase** e premi **Search**. I risultati compaiono man mano che vengono trovati, i più recenti per primi, fino a 25 video. Fai clic su uno per aprirlo; ognuno mostra la riga corrispondente e quante corrispondenze ha il video.
+Poi digita una **Frase di ricerca** e premi **Search**. I risultati compaiono man mano che vengono trovati, i più recenti per primi, fino a 25 video. Fai clic su uno per aprirlo; ognuno mostra la riga corrispondente e quante corrispondenze ha il video.
 
-A destra: il lettore, la riga trovata, una linea temporale, **Set In / Set Out** con margine e durata, **Precise Cut**, **Preview selection** e il nome del file. Scegli una cartella di download e aggiungi la selezione alla coda di download. La coda supporta pausa, ripresa, annullamento, nuovo tentativo e **Reveal file**, che mostra il file finito in Esplora file su Windows o nel Finder su macOS.
+A destra: il lettore, la riga trovata, una linea temporale, **Set In / Set Out** con margine e durata, **Precise Cut**, **Preview selection** e il nome del file. Scegli una cartella di download e aggiungi la selezione alla coda di download. La coda supporta pausa, ripresa, annullamento, nuovo tentativo e **Mostra file**, che mostra il file finito in Esplora file su Windows o nel Finder su macOS.
 
-I **Presets** salvano un elenco di canali o video per poterlo riprendere. **Save preset** è disattivato finché l’elenco è vuoto. **Load preset** apre la cartella dei preset per scegliere un file. Ogni modalità ha i propri preset. Clic destro sul nome di un preset: Load, Add to current list, Show in Finder, Rename e Remove from list. Clic destro su uno spazio vuoto: Clear files, Clear presets e Show presets folder. Rimuovere un preset dalla riga non elimina mai il suo file. Su Windows, **Show in Finder** mantiene questa etichetta ma apre Esplora file con il file del preset selezionato, e **Show presets folder** apre la cartella in Esplora file.
+I **Preset** salvano un elenco di canali o video per poterlo riprendere. **Salva preset** è disattivato finché l’elenco è vuoto. **Carica preset** apre la cartella dei preset per scegliere un file. Ogni modalità ha i propri preset. Clic destro sul nome di un preset: Load, Add to current list, Show in Finder, Rename e Remove from list. Clic destro su uno spazio vuoto: Clear files, Clear presets e Show presets folder. Rimuovere un preset dalla riga non elimina mai il suo file. Su Windows, **Mostra nel Finder** mantiene questa etichetta ma apre Esplora file con il file del preset selezionato, e **Mostra la cartella dei preset** apre la cartella in Esplora file.
 
 ### Corrispondenza
 
 - Maiuscole e minuscole, punteggiatura e stile dell’apostrofo vengono ignorati. Una frase può estendersi su segmenti di sottotitoli adiacenti.
 - Le lingue senza spazi (cinese, giapponese, thai e simili) vengono confrontate carattere per carattere. Le vocali dell’arabo e dell’ebraico vengono ignorate.
-- La lingua dei sottotitoli segue l’alfabeto della frase (una frase in cirillico cerca tracce in russo, ucraino e simili) oppure, per le lettere latine, la lingua parlata in ogni video. **Caption language** nelle impostazioni lo sostituisce, e questo raggiunge anche le tracce audio doppiate che alcuni canali pubblicano.
-- **Search in captions** limita la ricerca ai sottotitoli caricati, ai sottotitoli automatici di YouTube o a entrambi (con preferenza per quelli caricati). Le traduzioni non vengono mai usate.
+- La lingua dei sottotitoli segue l’alfabeto della frase (una frase in cirillico cerca tracce in russo, ucraino e simili) oppure, per le lettere latine, la lingua parlata in ogni video. **Lingua dei sottotitoli** nelle impostazioni lo sostituisce, e questo raggiunge anche le tracce audio doppiate che alcuni canali pubblicano.
+- **Cerca nei sottotitoli** limita la ricerca ai sottotitoli caricati, ai sottotitoli automatici di YouTube o a entrambi (con preferenza per quelli caricati). Le traduzioni non vengono mai usate.
 - I confini sono quelli dei segmenti di sottotitoli, non un allineamento parola per parola.
 
 ### Account & Settings
 
 - **Video player account:** **1. Sign in to Google**, **2. Connect YouTube** (scegli il tuo canale se richiesto) e **Check playback** aprono una finestra account separata per il lettore. L’accesso viene conservato nell’archivio del browser dell’app. Su YouTube, un avatar dell’account conferma che hai effettuato l’accesso, e il suo menu permette di cambiare account o uscire. Chiudi la finestra quando hai finito e cerca di nuovo per ricaricare il lettore.
-- **Download authentication:** da dove le richieste di sottotitoli e i download prendono l’accesso a YouTube. Scegli **Anonymous** (predefinito), **App's YouTube session**, un browser che l’app trova su questo computer oppure **Import Netscape cookies…**. I cookie non vengono mai copiati nelle impostazioni dell’app.
+- **Download authentication:** da dove le richieste di sottotitoli e i download prendono l’accesso a YouTube. Scegli **Anonimo** (predefinito), **App's YouTube session**, un browser che l’app trova su questo computer oppure **Importa cookie Netscape…**. I cookie non vengono mai copiati nelle impostazioni dell’app.
   - **Windows:** vengono rilevati Chrome, Edge, Firefox, Brave, Chromium, Vivaldi e Opera.
   - **macOS:** vengono rilevati Chrome, Opera, Vivaldi, Firefox, Safari e altri.
 - **Su Windows:**
   - Chiudi completamente il browser, compresi i processi in background, prima di cercare o scaricare con i suoi cookie. I browser Chromium (Chrome, Edge, Opera, Brave, Vivaldi, Chromium) bloccano il file dei cookie finché sono in esecuzione. Se l’app dice di non aver potuto copiare il database dei cookie del browser, è per questo.
-  - La cifratura dei cookie di Chromium su Windows può comunque impedire l’estrazione, e l’app non la aggira mai. Usa invece **App's YouTube session** o **Import Netscape cookies…**.
+  - La cifratura dei cookie di Chromium su Windows può comunque impedire l’estrazione, e l’app non la aggira mai. Usa invece **App's YouTube session** o **Importa cookie Netscape…**.
   - L’app passa a yt-dlp il proxy HTTP manuale del sistema (senza nome utente né password) e rispetta `HTTP_PROXY` e `HTTPS_PROXY`. Uno script PAC o un elenco di esclusioni con voci diverse dagli indirizzi locali non viene inoltrato.
   - La cartella di download e un file di cookie importato vengono salvati come percorsi completi. Se una copia portatile passa a un’altra lettera di unità, sceglili di nuovo.
   - Mettere in pausa un download sospende il suo processo, quindi una pausa lunga può far cadere la connessione con YouTube. Pausa e ripresa non sopravvivono a un riavvio dell’app.
   - Su Windows non esiste l’Accesso completo al disco (Full Disk Access), quindi la finestra di aiuto di macOS descritta sotto non compare mai.
 - **Su macOS:** i cookie di Chrome e Firefox richiedono l’**Accesso completo al disco** (Full Disk Access); l’app apre una piccola finestra di aiuto con un’icona da trascinare nelle Impostazioni di Sistema (System Settings).
 - **I nomi di file** che Windows non può salvare (nomi riservati come `CON` o `NUL`, e caratteri come `? * | < >`) vengono rifiutati su ogni piattaforma, così una clip può passare dall’una all’altra.
-- **Videos to scan per search** (per canale, predefinito 50), **Results from several channels**, **Caption language**, **Search in captions**.
-- **Don't play the first found video automatically** e **While a video loads** (miniatura o indicatore di caricamento).
+- **Video da controllare per ricerca** (per canale, predefinito 50), **Risultati da più canali**, **Lingua dei sottotitoli**, **Cerca nei sottotitoli**.
+- **Don't play the first found video automatically** e **Mentre un video si carica** (miniatura o indicatore di caricamento).
 
 ## Dove vengono conservati i dati
 

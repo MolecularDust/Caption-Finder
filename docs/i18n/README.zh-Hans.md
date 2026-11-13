@@ -43,7 +43,7 @@
 
 # Caption Finder
 
-> 本译文由 AI 撰写，未经母语人士审校。应用本身为英文，因此按钮和菜单的名称保持英文。如有疑问，请以[英文 README](../../README.md)为准。
+> 本译文由 AI 撰写，未经母语人士审校。应用也提供此语言版本，按钮和菜单的名称按应用中的显示写出 (可在 Account & Settings → Language 中切换语言)。如有疑问，请以[英文 README](../../README.md)为准。
 
 在 YouTube 视频中找到某句话被说出的那一刻，选出你喜欢的片段，并下载裁剪好的剪辑。
 
@@ -83,54 +83,54 @@
 
 ## 设置 YouTube 访问
 
-1. 安装 Caption Finder 并打开 **Account & Settings**。
-2. 在 **Video player account** 下，点击 **1. Sign in to Google**，然后点击 **2. Connect YouTube**，如有提示请选择你的频道。完成后关闭账户窗口。
-3. 在 **Download authentication** 下，选择 **App’s YouTube session**。
+1. 安装 Caption Finder 并打开 **账号与设置**。
+2. 在 **视频播放器账号** 下，点击 **1. Sign in to Google**，然后点击 **2. Connect YouTube**，如有提示请选择你的频道。完成后关闭账户窗口。
+3. 在 **下载认证** 下，选择 **应用的 YouTube 会话**。
 
 现在可以使用 Caption Finder 了。
 
-如果想改用你已登录的浏览器，请在 **Download authentication** 下选择它。在 Windows 上，搜索前请先关闭该浏览器：Chromium 系浏览器在运行时会锁定其 Cookie 文件，因此在那里应用自己的会话才是可靠的选择。在 macOS 上无需关闭浏览器。只使用你自己的账户。不要导入或分享别人的 Cookie。
+如果想改用你已登录的浏览器，请在 **下载认证** 下选择它。在 Windows 上，搜索前请先关闭该浏览器：Chromium 系浏览器在运行时会锁定其 Cookie 文件，因此在那里应用自己的会话才是可靠的选择。在 macOS 上无需关闭浏览器。只使用你自己的账户。不要导入或分享别人的 Cookie。
 
-你也可以保持 **Anonymous**，但 YouTube 对匿名访问的反机器人检查更严格，部分视频会失败。
+你也可以保持 **匿名**，但 YouTube 对匿名访问的反机器人检查更严格，部分视频会失败。
 
 ## 使用方法
 
-**Search across** 用来选择模式。
+**搜索范围** 用来选择模式。
 
 - **Channels：** 输入名称，会出现匹配的频道列表（按 Enter 立即显示）。点击一个即可添加。频道链接或 `@handle` 会被直接添加，粘贴的视频链接则会建议它所属的频道。多个频道会依次搜索，或交替混合（轮流从每个频道取一个视频）；参见 Account & Settings。
 - **Videos：** 粘贴视频链接（watch、`youtu.be` 或 Shorts），一个或多个均可。列表中的视频按顺序搜索。
 
-然后输入 **Search phrase** 并按 **Search**。结果在找到时就会出现，最新的在前，最多 25 个视频。点击一个即可打开；每个结果都会显示匹配的那一行以及该视频的匹配次数。
+然后输入 **搜索短语** 并按 **Search**。结果在找到时就会出现，最新的在前，最多 25 个视频。点击一个即可打开；每个结果都会显示匹配的那一行以及该视频的匹配次数。
 
-右侧：播放器、匹配的那一行、时间轴、带有间隔和时长的 **Set In / Set Out**、**Precise Cut**、**Preview selection** 以及文件名。选择一个下载文件夹，把所选片段添加到下载队列。队列支持暂停、继续、取消、重试，以及 **Reveal file**，它会在 Windows 上用文件资源管理器、在 macOS 上用 Finder 显示已完成的文件。
+右侧：播放器、匹配的那一行、时间轴、带有间隔和时长的 **Set In / Set Out**、**Precise Cut**、**Preview selection** 以及文件名。选择一个下载文件夹，把所选片段添加到下载队列。队列支持暂停、继续、取消、重试，以及 **显示文件**，它会在 Windows 上用文件资源管理器、在 macOS 上用 Finder 显示已完成的文件。
 
-**Presets** 保存一份频道或视频列表，方便你之后调出。列表为空时 **Save preset** 不可用。**Load preset** 会打开预设文件夹以便选择文件。每种模式都有自己的预设。右键点击预设名称：Load、Add to current list、Show in Finder、Rename 和 Remove from list。右键点击空白处：Clear files、Clear presets 和 Show presets folder。从行中移除预设绝不会删除它的文件。在 Windows 上，**Show in Finder** 保留该标签，但会打开文件资源管理器并选中预设文件，**Show presets folder** 会在文件资源管理器中打开该文件夹。
+**预设** 保存一份频道或视频列表，方便你之后调出。列表为空时 **保存预设** 不可用。**载入预设** 会打开预设文件夹以便选择文件。每种模式都有自己的预设。右键点击预设名称：Load、Add to current list、Show in Finder、Rename 和 Remove from list。右键点击空白处：Clear files、Clear presets 和 Show presets folder。从行中移除预设绝不会删除它的文件。在 Windows 上，**在访达中显示** 保留该标签，但会打开文件资源管理器并选中预设文件，**显示预设文件夹** 会在文件资源管理器中打开该文件夹。
 
 ### 匹配
 
 - 大小写、标点和撇号样式都会被忽略。一句话可以跨越相邻的字幕片段。
 - 没有空格的语言（中文、日语、泰语等）按字符逐个匹配。阿拉伯语和希伯来语的元音符号会被忽略。
-- 字幕语言跟随短语的文字（西里尔字母的短语会寻找俄语、乌克兰语等轨道），对于拉丁字母则跟随每个视频所说的语言。设置中的 **Caption language** 会覆盖这一点，这也会作用于某些频道发布的配音音轨。
-- **Search in captions** 把搜索限制在上传的字幕、YouTube 的自动字幕，或两者之一（优先上传的字幕）。绝不使用翻译。
+- 字幕语言跟随短语的文字（西里尔字母的短语会寻找俄语、乌克兰语等轨道），对于拉丁字母则跟随每个视频所说的语言。设置中的 **字幕语言** 会覆盖这一点，这也会作用于某些频道发布的配音音轨。
+- **在字幕中搜索** 把搜索限制在上传的字幕、YouTube 的自动字幕，或两者之一（优先上传的字幕）。绝不使用翻译。
 - 边界是字幕片段的边界，而不是逐词对齐。
 
 ### Account & Settings
 
 - **Video player account：** **1. Sign in to Google**、**2. Connect YouTube**（如有提示请选择频道）和 **Check playback** 会为播放器打开一个单独的账户窗口。登录信息保存在应用自己的浏览器存储中。在 YouTube 上，账户头像可确认你已登录，账户菜单可切换账户或退出登录。完成后关闭窗口，再次搜索以重新加载播放器。
-- **Download authentication：** 字幕查询和下载从哪里获取 YouTube 登录。可选择 **Anonymous**（默认）、**App's YouTube session**、应用在这台电脑上找到的浏览器，或 **Import Netscape cookies…**。Cookie 绝不会被复制到应用的设置中。
+- **Download authentication：** 字幕查询和下载从哪里获取 YouTube 登录。可选择 **匿名**（默认）、**App's YouTube session**、应用在这台电脑上找到的浏览器，或 **导入 Netscape Cookie…**。Cookie 绝不会被复制到应用的设置中。
   - **Windows：** 可检测到 Chrome、Edge、Firefox、Brave、Chromium、Vivaldi 和 Opera。
   - **macOS：** 可检测到 Chrome、Opera、Vivaldi、Firefox、Safari 等。
 - **在 Windows 上：**
   - 在用某个浏览器的 Cookie 搜索或下载之前，请完全关闭该浏览器，包括它的后台进程。Chromium 系浏览器（Chrome、Edge、Opera、Brave、Vivaldi、Chromium）在运行时会锁定其 Cookie 文件。如果应用提示无法复制浏览器的 Cookie 数据库，原因就在这里。
-  - Windows 上 Chromium 的 Cookie 加密仍可能阻止提取，而应用绝不会绕过它。请改用 **App's YouTube session** 或 **Import Netscape cookies…**。
+  - Windows 上 Chromium 的 Cookie 加密仍可能阻止提取，而应用绝不会绕过它。请改用 **App's YouTube session** 或 **导入 Netscape Cookie…**。
   - 应用会把系统的手动 HTTP 代理（不含用户名和密码）传给 yt-dlp，并遵循 `HTTP_PROXY` 和 `HTTPS_PROXY`。PAC 脚本，或包含本地地址以外条目的例外列表，不会被转发。
   - 下载文件夹和导入的 Cookie 文件以完整路径保存。如果便携副本移到了另一个盘符，请重新选择它们。
   - 暂停下载会挂起其进程，因此长时间暂停可能导致 YouTube 断开连接。暂停和继续在应用重启后不会保留。
   - Windows 上没有“完全磁盘访问权限”（Full Disk Access），所以下面的 macOS 辅助窗口永远不会出现。
 - **在 macOS 上：** Chrome 和 Firefox 的 Cookie 需要**完全磁盘访问权限**（Full Disk Access）；应用会打开一个小的辅助窗口，其中的图标可拖到系统设置（System Settings）。
 - Windows 无法保存的**文件名**（`CON` 或 `NUL` 之类的保留名称，以及 `? * | < >` 之类的字符）在所有平台上都会被拒绝，这样剪辑就可以在两者之间移动。
-- **Videos to scan per search**（每个频道，默认 50）、**Results from several channels**、**Caption language**、**Search in captions**。
-- **Don't play the first found video automatically**，以及 **While a video loads**（缩略图或加载动画）。
+- **每次搜索扫描的视频数**（每个频道，默认 50）、**来自多个频道的结果**、**字幕语言**、**在字幕中搜索**。
+- **Don't play the first found video automatically**，以及 **视频加载时**（缩略图或加载动画）。
 
 ## 数据保存在哪里
 

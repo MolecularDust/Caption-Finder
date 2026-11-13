@@ -2708,7 +2708,7 @@ function App() {
           )}
         </section>
         <footer>
-          <span>YOUGLISH DOWNLOADER</span>
+          <span>CAPTION FINDER</span>
           <span>{t("Made for your personal library.")}</span>
         </footer>
       </main>
