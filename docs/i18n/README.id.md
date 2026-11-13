@@ -84,7 +84,7 @@ Aplikasi ini ditandatangani ad hoc dan tidak dinotarisasi, jadi macOS memblokir 
 ## Menyiapkan akses YouTube
 
 1. Pasang Caption Finder dan buka **Akun & Pengaturan**.
-2. Di bawah **Akun pemutar video**, klik **1. Sign in to Google**, lalu **2. Connect YouTube**, dan pilih kanal Anda jika diminta. Tutup jendela akun setelah selesai.
+2. Di bawah **Akun pemutar video**, klik **1. Masuk ke Google**, lalu **2. Hubungkan YouTube**, dan pilih kanal Anda jika diminta. Tutup jendela akun setelah selesai.
 3. Di bawah **Autentikasi unduhan**, pilih **Sesi YouTube aplikasi**.
 
 Anda siap menggunakan Caption Finder.
@@ -97,12 +97,12 @@ Anda juga bisa tetap memakai **Anonim**, tetapi pemeriksaan anti-bot YouTube leb
 
 **Cari di** memilih mode.
 
-- **Channels:** ketik nama dan daftar kanal yang cocok akan muncul (Enter menampilkannya seketika). Klik satu untuk menambahkannya. Tautan kanal atau `@handle` langsung ditambahkan, dan tautan video yang ditempel akan menyarankan kanal pemiliknya. Beberapa kanal dicari satu per satu, atau dicampur (satu video dari tiap kanal secara bergiliran); lihat Account & Settings.
-- **Videos:** tempel tautan video (watch, `youtu.be`, atau Shorts), satu atau banyak. Video dalam daftar dicari secara berurutan.
+- **Kanal:** ketik nama dan daftar kanal yang cocok akan muncul (Enter menampilkannya seketika). Klik satu untuk menambahkannya. Tautan kanal atau `@handle` langsung ditambahkan, dan tautan video yang ditempel akan menyarankan kanal pemiliknya. Beberapa kanal dicari satu per satu, atau dicampur (satu video dari tiap kanal secara bergiliran); lihat Account & Settings.
+- **Video:** tempel tautan video (watch, `youtu.be`, atau Shorts), satu atau banyak. Video dalam daftar dicari secara berurutan.
 
-Lalu ketik **Frasa pencarian** dan tekan **Search**. Hasil muncul saat ditemukan, yang terbaru lebih dulu, hingga 25 video. Klik satu untuk membukanya; masing-masing menampilkan baris yang cocok dan jumlah kecocokan pada video itu.
+Lalu ketik **Frasa pencarian** dan tekan **Cari**. Hasil muncul saat ditemukan, yang terbaru lebih dulu, hingga 25 video. Klik satu untuk membukanya; masing-masing menampilkan baris yang cocok dan jumlah kecocokan pada video itu.
 
-Di sebelah kanan: pemutar, baris yang cocok, lini masa, **Set In / Set Out** dengan padding dan durasi, **Precise Cut**, **Preview selection**, dan nama berkas. Pilih folder unduhan dan tambahkan pilihan ke antrean unduhan. Antrean mendukung jeda, lanjut, batal, coba lagi, dan **Tampilkan file**, yang menampilkan berkas selesai di File Explorer pada Windows atau di Finder pada macOS.
+Di sebelah kanan: pemutar, baris yang cocok, lini masa, **Atur Mulai / Atur Selesai** dengan padding dan durasi, **Precise Cut**, **Pratinjau pilihan**, dan nama berkas. Pilih folder unduhan dan tambahkan pilihan ke antrean unduhan. Antrean mendukung jeda, lanjut, batal, coba lagi, dan **Tampilkan file**, yang menampilkan berkas selesai di File Explorer pada Windows atau di Finder pada macOS.
 
 **Preset** menyimpan daftar kanal atau video agar bisa Anda panggil kembali. **Simpan preset** nonaktif sampai daftar berisi sesuatu. **Muat preset** membuka folder preset untuk memilih berkas. Setiap mode punya preset sendiri. Klik kanan nama preset: Load, Add to current list, Show in Finder, Rename, dan Remove from list. Klik kanan ruang kosong: Clear files, Clear presets, dan Show presets folder. Menghapus preset dari baris tidak pernah menghapus berkasnya. Di Windows, **Tampilkan di Finder** mempertahankan label itu tetapi membuka File Explorer dengan berkas preset terpilih, dan **Tampilkan folder preset** membuka folder di File Explorer.
 
@@ -116,13 +116,13 @@ Di sebelah kanan: pemutar, baris yang cocok, lini masa, **Set In / Set Out** den
 
 ### Account & Settings
 
-- **Video player account:** **1. Sign in to Google**, **2. Connect YouTube** (pilih kanal Anda jika diminta), dan **Check playback** membuka jendela akun terpisah untuk pemutar. Login disimpan di penyimpanan browser milik aplikasi. Di YouTube, avatar akun menegaskan bahwa Anda sudah masuk, dan menu akunnya berganti akun atau keluar. Tutup jendela setelah selesai dan cari lagi untuk memuat ulang pemutar.
-- **Download authentication:** dari mana pencarian subtitel dan unduhan mengambil login YouTube. Pilih **Anonim** (bawaan), **App's YouTube session**, browser yang ditemukan aplikasi di komputer ini, atau **Impor cookie Netscape…**. Cookie tidak pernah disalin ke pengaturan aplikasi.
+- **Akun pemutar video:** **1. Masuk ke Google**, **2. Hubungkan YouTube** (pilih kanal Anda jika diminta), dan **Periksa pemutaran** membuka jendela akun terpisah untuk pemutar. Login disimpan di penyimpanan browser milik aplikasi. Di YouTube, avatar akun menegaskan bahwa Anda sudah masuk, dan menu akunnya berganti akun atau keluar. Tutup jendela setelah selesai dan cari lagi untuk memuat ulang pemutar.
+- **Autentikasi unduhan:** dari mana pencarian subtitel dan unduhan mengambil login YouTube. Pilih **Anonim** (bawaan), **Sesi YouTube aplikasi**, browser yang ditemukan aplikasi di komputer ini, atau **Impor cookie Netscape…**. Cookie tidak pernah disalin ke pengaturan aplikasi.
   - **Windows:** Chrome, Edge, Firefox, Brave, Chromium, Vivaldi, dan Opera terdeteksi.
   - **macOS:** Chrome, Opera, Vivaldi, Firefox, Safari, dan lainnya terdeteksi.
 - **Di Windows:**
   - Tutup browser sepenuhnya, termasuk proses latar belakangnya, sebelum mencari atau mengunduh dengan cookie-nya. Browser Chromium (Chrome, Edge, Opera, Brave, Vivaldi, Chromium) mengunci berkas cookie-nya selama berjalan. Jika aplikasi menyatakan tidak dapat menyalin basis data cookie browser, inilah penyebabnya.
-  - Enkripsi cookie Chromium di Windows masih bisa menghalangi ekstraksi, dan aplikasi tidak pernah mengakalinya. Gunakan **App's YouTube session** atau **Impor cookie Netscape…** sebagai gantinya.
+  - Enkripsi cookie Chromium di Windows masih bisa menghalangi ekstraksi, dan aplikasi tidak pernah mengakalinya. Gunakan **Sesi YouTube aplikasi** atau **Impor cookie Netscape…** sebagai gantinya.
   - Aplikasi meneruskan proxy HTTP manual sistem (tanpa nama pengguna dan kata sandi) ke yt-dlp, dan mematuhi `HTTP_PROXY` serta `HTTPS_PROXY`. Skrip PAC atau daftar pengecualian dengan entri selain alamat lokal tidak diteruskan.
   - Folder unduhan dan berkas cookie yang diimpor disimpan sebagai path lengkap. Jika salinan portabel dipindahkan ke huruf drive lain, pilih keduanya lagi.
   - Menjeda unduhan menangguhkan prosesnya, jadi jeda yang lama dapat membuat YouTube memutus koneksi. Jeda dan lanjut tidak bertahan setelah aplikasi dimulai ulang.
@@ -130,7 +130,7 @@ Di sebelah kanan: pemutar, baris yang cocok, lini masa, **Set In / Set Out** den
 - **Di macOS:** cookie Chrome dan Firefox memerlukan **Akses Disk Penuh** (Full Disk Access); aplikasi membuka jendela bantuan kecil dengan ikon yang diseret ke Pengaturan Sistem (System Settings).
 - **Nama berkas** yang tidak dapat disimpan Windows (nama yang dicadangkan seperti `CON` atau `NUL`, dan karakter seperti `? * | < >`) ditolak di semua platform, sehingga klip bisa berpindah antar keduanya.
 - **Video yang dipindai per pencarian** (per kanal, bawaan 50), **Hasil dari beberapa kanal**, **Bahasa teks**, **Cari di teks**.
-- **Don't play the first found video automatically** dan **Saat video dimuat** (gambar mini atau indikator pemuatan).
+- **Jangan putar video pertama yang ditemukan secara otomatis** dan **Saat video dimuat** (gambar mini atau indikator pemuatan).
 
 ## Tempat penyimpanan data
 

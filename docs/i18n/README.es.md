@@ -84,7 +84,7 @@ La aplicación está firmada ad hoc y no está notarizada, así que macOS bloque
 ## Configurar el acceso a YouTube
 
 1. Instala Caption Finder y abre **Cuenta y ajustes**.
-2. En **Cuenta del reproductor de vídeo**, haz clic en **1. Sign in to Google** y luego en **2. Connect YouTube**, y elige tu canal si te lo piden. Cierra la ventana de la cuenta cuando termines.
+2. En **Cuenta del reproductor de vídeo**, haz clic en **1. Iniciar sesión en Google** y luego en **2. Conectar YouTube**, y elige tu canal si te lo piden. Cierra la ventana de la cuenta cuando termines.
 3. En **Autenticación de las descargas**, elige **Sesión de YouTube de la app**.
 
 Ya puedes usar Caption Finder.
@@ -97,12 +97,12 @@ También puedes dejar **Anónimo**, pero los controles antibots de YouTube son m
 
 **Buscar en** elige el modo.
 
-- **Channels:** escribe un nombre y aparece una lista de canales coincidentes (Intro la muestra al instante). Haz clic en uno para añadirlo. Un enlace de canal o un `@handle` se añade directamente, y un enlace de vídeo pegado sugiere el canal al que pertenece. Varios canales se buscan uno tras otro, o mezclados (un vídeo de cada uno por turnos); consulta Account & Settings.
-- **Videos:** pega enlaces de vídeos (watch, `youtu.be` o Shorts), uno o varios. Los vídeos de la lista se buscan en orden.
+- **Canales:** escribe un nombre y aparece una lista de canales coincidentes (Intro la muestra al instante). Haz clic en uno para añadirlo. Un enlace de canal o un `@handle` se añade directamente, y un enlace de vídeo pegado sugiere el canal al que pertenece. Varios canales se buscan uno tras otro, o mezclados (un vídeo de cada uno por turnos); consulta Account & Settings.
+- **Vídeos:** pega enlaces de vídeos (watch, `youtu.be` o Shorts), uno o varios. Los vídeos de la lista se buscan en orden.
 
-Luego escribe una **Frase de búsqueda** y pulsa **Search**. Los resultados aparecen a medida que se encuentran, los más recientes primero, hasta 25 vídeos. Haz clic en uno para abrirlo; cada uno muestra la línea coincidente y cuántas coincidencias tiene el vídeo.
+Luego escribe una **Frase de búsqueda** y pulsa **Buscar**. Los resultados aparecen a medida que se encuentran, los más recientes primero, hasta 25 vídeos. Haz clic en uno para abrirlo; cada uno muestra la línea coincidente y cuántas coincidencias tiene el vídeo.
 
-A la derecha: el reproductor, la línea encontrada, una línea de tiempo, **Set In / Set Out** con margen y duración, **Precise Cut**, **Preview selection** y el nombre del archivo. Elige una carpeta de descarga y añade la selección a la cola de descargas. La cola permite pausar, reanudar, cancelar, reintentar y **Mostrar archivo**, que muestra el archivo terminado en el Explorador de archivos en Windows o en el Finder en macOS.
+A la derecha: el reproductor, la línea encontrada, una línea de tiempo, **Fijar entrada / Fijar salida** con margen y duración, **Precise Cut**, **Vista previa de la selección** y el nombre del archivo. Elige una carpeta de descarga y añade la selección a la cola de descargas. La cola permite pausar, reanudar, cancelar, reintentar y **Mostrar archivo**, que muestra el archivo terminado en el Explorador de archivos en Windows o en el Finder en macOS.
 
 Los **Preajustes** guardan una lista de canales o vídeos para recuperarla. **Guardar preajuste** está desactivado hasta que la lista tiene algo. **Cargar preajuste** abre la carpeta de presets para elegir un archivo. Cada modo tiene sus propios presets. Haz clic derecho en el nombre de un preset: Load, Add to current list, Show in Finder, Rename y Remove from list. Clic derecho en un espacio vacío: Clear files, Clear presets y Show presets folder. Quitar un preset de la fila nunca borra su archivo. En Windows, **Mostrar en el Finder** conserva esa etiqueta pero abre el Explorador de archivos con el archivo del preset seleccionado, y **Mostrar la carpeta de preajustes** abre la carpeta en el Explorador de archivos.
 
@@ -116,13 +116,13 @@ Los **Preajustes** guardan una lista de canales o vídeos para recuperarla. **Gu
 
 ### Account & Settings
 
-- **Video player account:** **1. Sign in to Google**, **2. Connect YouTube** (elige tu canal si te lo piden) y **Check playback** abren una ventana de cuenta aparte para el reproductor. El inicio de sesión se guarda en el almacenamiento de navegador propio de la aplicación. En YouTube, un avatar de cuenta confirma que has iniciado sesión, y su menú de cuenta cambia de cuenta o cierra la sesión. Cierra la ventana cuando termines y vuelve a buscar para recargar el reproductor.
-- **Download authentication:** de dónde sacan su inicio de sesión de YouTube las consultas de subtítulos y las descargas. Elige **Anónimo** (el valor por defecto), **App's YouTube session**, un navegador que la aplicación encuentre en este equipo o **Importar cookies de Netscape…**. Las cookies nunca se copian a los ajustes de la aplicación.
+- **Cuenta del reproductor de vídeo:** **1. Iniciar sesión en Google**, **2. Conectar YouTube** (elige tu canal si te lo piden) y **Comprobar la reproducción** abren una ventana de cuenta aparte para el reproductor. El inicio de sesión se guarda en el almacenamiento de navegador propio de la aplicación. En YouTube, un avatar de cuenta confirma que has iniciado sesión, y su menú de cuenta cambia de cuenta o cierra la sesión. Cierra la ventana cuando termines y vuelve a buscar para recargar el reproductor.
+- **Autenticación de las descargas:** de dónde sacan su inicio de sesión de YouTube las consultas de subtítulos y las descargas. Elige **Anónimo** (el valor por defecto), **Sesión de YouTube de la app**, un navegador que la aplicación encuentre en este equipo o **Importar cookies de Netscape…**. Las cookies nunca se copian a los ajustes de la aplicación.
   - **Windows:** se detectan Chrome, Edge, Firefox, Brave, Chromium, Vivaldi y Opera.
   - **macOS:** se detectan Chrome, Opera, Vivaldi, Firefox, Safari y otros.
 - **En Windows:**
   - Cierra el navegador por completo, incluidos sus procesos en segundo plano, antes de buscar o descargar con sus cookies. Los navegadores Chromium (Chrome, Edge, Opera, Brave, Vivaldi, Chromium) bloquean su archivo de cookies mientras se ejecutan. Si la aplicación dice que no pudo copiar la base de datos de cookies del navegador, es por esto.
-  - El cifrado de cookies de Chromium en Windows aún puede impedir la extracción, y la aplicación nunca lo elude. Usa en su lugar **App's YouTube session** o **Importar cookies de Netscape…**.
+  - El cifrado de cookies de Chromium en Windows aún puede impedir la extracción, y la aplicación nunca lo elude. Usa en su lugar **Sesión de YouTube de la app** o **Importar cookies de Netscape…**.
   - La aplicación pasa a yt-dlp el proxy HTTP manual del sistema (sin nombre de usuario ni contraseña) y respeta `HTTP_PROXY` y `HTTPS_PROXY`. No se reenvía un script PAC ni una lista de excepciones con entradas distintas de direcciones locales.
   - La carpeta de descarga y un archivo de cookies importado se guardan como rutas completas. Si una copia portátil pasa a otra letra de unidad, vuelve a elegirlos.
   - Pausar una descarga suspende su proceso, así que una pausa larga puede hacer que YouTube corte la conexión. La pausa y la reanudación no sobreviven a un reinicio de la aplicación.
@@ -130,7 +130,7 @@ Los **Preajustes** guardan una lista de canales o vídeos para recuperarla. **Gu
 - **En macOS:** las cookies de Chrome y Firefox necesitan el **Acceso total al disco** (Full Disk Access); la aplicación abre una pequeña ventana de ayuda con un icono para arrastrar a los Ajustes del Sistema (System Settings).
 - **Los nombres de archivo** que Windows no puede guardar (nombres reservados como `CON` o `NUL`, y caracteres como `? * | < >`) se rechazan en todas las plataformas, para que un clip pueda pasar de una a otra.
 - **Vídeos a revisar por búsqueda** (por canal, 50 por defecto), **Resultados de varios canales**, **Idioma de los subtítulos**, **Buscar en los subtítulos**.
-- **Don't play the first found video automatically** y **Mientras se carga un vídeo** (miniatura o indicador de carga).
+- **No reproducir automáticamente el primer vídeo encontrado** y **Mientras se carga un vídeo** (miniatura o indicador de carga).
 
 ## Dónde se guarda cada cosa
 

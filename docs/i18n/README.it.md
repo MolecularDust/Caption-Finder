@@ -84,7 +84,7 @@ L’app è firmata ad hoc e non è notarizzata, quindi macOS blocca il programma
 ## Configurare l’accesso a YouTube
 
 1. Installa Caption Finder e apri **Account e impostazioni**.
-2. Sotto **Account del lettore video**, fai clic su **1. Sign in to Google**, poi su **2. Connect YouTube**, e scegli il tuo canale se richiesto. Chiudi la finestra dell’account quando hai finito.
+2. Sotto **Account del lettore video**, fai clic su **1. Accedi a Google**, poi su **2. Collega YouTube**, e scegli il tuo canale se richiesto. Chiudi la finestra dell’account quando hai finito.
 3. Sotto **Autenticazione dei download**, scegli **Sessione YouTube dell’app**.
 
 Sei pronto a usare Caption Finder.
@@ -97,12 +97,12 @@ Puoi anche lasciare **Anonimo**, ma i controlli anti-bot di YouTube sono più se
 
 **Cerca in** sceglie la modalità.
 
-- **Channels:** digita un nome e compare un elenco di canali corrispondenti (Invio lo mostra subito). Fai clic su uno per aggiungerlo. Un link di canale o un `@handle` viene aggiunto direttamente, e un link di video incollato suggerisce il canale a cui appartiene. Più canali vengono cercati uno dopo l’altro, oppure mescolati (un video da ciascuno a turno); vedi Account & Settings.
-- **Videos:** incolla link di video (watch, `youtu.be` o Shorts), uno o molti. I video in elenco vengono cercati in ordine.
+- **Canali:** digita un nome e compare un elenco di canali corrispondenti (Invio lo mostra subito). Fai clic su uno per aggiungerlo. Un link di canale o un `@handle` viene aggiunto direttamente, e un link di video incollato suggerisce il canale a cui appartiene. Più canali vengono cercati uno dopo l’altro, oppure mescolati (un video da ciascuno a turno); vedi Account & Settings.
+- **Video:** incolla link di video (watch, `youtu.be` o Shorts), uno o molti. I video in elenco vengono cercati in ordine.
 
-Poi digita una **Frase di ricerca** e premi **Search**. I risultati compaiono man mano che vengono trovati, i più recenti per primi, fino a 25 video. Fai clic su uno per aprirlo; ognuno mostra la riga corrispondente e quante corrispondenze ha il video.
+Poi digita una **Frase di ricerca** e premi **Cerca**. I risultati compaiono man mano che vengono trovati, i più recenti per primi, fino a 25 video. Fai clic su uno per aprirlo; ognuno mostra la riga corrispondente e quante corrispondenze ha il video.
 
-A destra: il lettore, la riga trovata, una linea temporale, **Set In / Set Out** con margine e durata, **Precise Cut**, **Preview selection** e il nome del file. Scegli una cartella di download e aggiungi la selezione alla coda di download. La coda supporta pausa, ripresa, annullamento, nuovo tentativo e **Mostra file**, che mostra il file finito in Esplora file su Windows o nel Finder su macOS.
+A destra: il lettore, la riga trovata, una linea temporale, **Imposta inizio / Imposta fine** con margine e durata, **Precise Cut**, **Anteprima della selezione** e il nome del file. Scegli una cartella di download e aggiungi la selezione alla coda di download. La coda supporta pausa, ripresa, annullamento, nuovo tentativo e **Mostra file**, che mostra il file finito in Esplora file su Windows o nel Finder su macOS.
 
 I **Preset** salvano un elenco di canali o video per poterlo riprendere. **Salva preset** è disattivato finché l’elenco è vuoto. **Carica preset** apre la cartella dei preset per scegliere un file. Ogni modalità ha i propri preset. Clic destro sul nome di un preset: Load, Add to current list, Show in Finder, Rename e Remove from list. Clic destro su uno spazio vuoto: Clear files, Clear presets e Show presets folder. Rimuovere un preset dalla riga non elimina mai il suo file. Su Windows, **Mostra nel Finder** mantiene questa etichetta ma apre Esplora file con il file del preset selezionato, e **Mostra la cartella dei preset** apre la cartella in Esplora file.
 
@@ -116,13 +116,13 @@ I **Preset** salvano un elenco di canali o video per poterlo riprendere. **Salva
 
 ### Account & Settings
 
-- **Video player account:** **1. Sign in to Google**, **2. Connect YouTube** (scegli il tuo canale se richiesto) e **Check playback** aprono una finestra account separata per il lettore. L’accesso viene conservato nell’archivio del browser dell’app. Su YouTube, un avatar dell’account conferma che hai effettuato l’accesso, e il suo menu permette di cambiare account o uscire. Chiudi la finestra quando hai finito e cerca di nuovo per ricaricare il lettore.
-- **Download authentication:** da dove le richieste di sottotitoli e i download prendono l’accesso a YouTube. Scegli **Anonimo** (predefinito), **App's YouTube session**, un browser che l’app trova su questo computer oppure **Importa cookie Netscape…**. I cookie non vengono mai copiati nelle impostazioni dell’app.
+- **Account del lettore video:** **1. Accedi a Google**, **2. Collega YouTube** (scegli il tuo canale se richiesto) e **Verifica la riproduzione** aprono una finestra account separata per il lettore. L’accesso viene conservato nell’archivio del browser dell’app. Su YouTube, un avatar dell’account conferma che hai effettuato l’accesso, e il suo menu permette di cambiare account o uscire. Chiudi la finestra quando hai finito e cerca di nuovo per ricaricare il lettore.
+- **Autenticazione dei download:** da dove le richieste di sottotitoli e i download prendono l’accesso a YouTube. Scegli **Anonimo** (predefinito), **Sessione YouTube dell’app**, un browser che l’app trova su questo computer oppure **Importa cookie Netscape…**. I cookie non vengono mai copiati nelle impostazioni dell’app.
   - **Windows:** vengono rilevati Chrome, Edge, Firefox, Brave, Chromium, Vivaldi e Opera.
   - **macOS:** vengono rilevati Chrome, Opera, Vivaldi, Firefox, Safari e altri.
 - **Su Windows:**
   - Chiudi completamente il browser, compresi i processi in background, prima di cercare o scaricare con i suoi cookie. I browser Chromium (Chrome, Edge, Opera, Brave, Vivaldi, Chromium) bloccano il file dei cookie finché sono in esecuzione. Se l’app dice di non aver potuto copiare il database dei cookie del browser, è per questo.
-  - La cifratura dei cookie di Chromium su Windows può comunque impedire l’estrazione, e l’app non la aggira mai. Usa invece **App's YouTube session** o **Importa cookie Netscape…**.
+  - La cifratura dei cookie di Chromium su Windows può comunque impedire l’estrazione, e l’app non la aggira mai. Usa invece **Sessione YouTube dell’app** o **Importa cookie Netscape…**.
   - L’app passa a yt-dlp il proxy HTTP manuale del sistema (senza nome utente né password) e rispetta `HTTP_PROXY` e `HTTPS_PROXY`. Uno script PAC o un elenco di esclusioni con voci diverse dagli indirizzi locali non viene inoltrato.
   - La cartella di download e un file di cookie importato vengono salvati come percorsi completi. Se una copia portatile passa a un’altra lettera di unità, sceglili di nuovo.
   - Mettere in pausa un download sospende il suo processo, quindi una pausa lunga può far cadere la connessione con YouTube. Pausa e ripresa non sopravvivono a un riavvio dell’app.
@@ -130,7 +130,7 @@ I **Preset** salvano un elenco di canali o video per poterlo riprendere. **Salva
 - **Su macOS:** i cookie di Chrome e Firefox richiedono l’**Accesso completo al disco** (Full Disk Access); l’app apre una piccola finestra di aiuto con un’icona da trascinare nelle Impostazioni di Sistema (System Settings).
 - **I nomi di file** che Windows non può salvare (nomi riservati come `CON` o `NUL`, e caratteri come `? * | < >`) vengono rifiutati su ogni piattaforma, così una clip può passare dall’una all’altra.
 - **Video da controllare per ricerca** (per canale, predefinito 50), **Risultati da più canali**, **Lingua dei sottotitoli**, **Cerca nei sottotitoli**.
-- **Don't play the first found video automatically** e **Mentre un video si carica** (miniatura o indicatore di caricamento).
+- **Non riprodurre automaticamente il primo video trovato** e **Mentre un video si carica** (miniatura o indicatore di caricamento).
 
 ## Dove vengono conservati i dati
 

@@ -84,7 +84,7 @@ L’application est signée ad hoc et n’est pas notariée ; macOS bloque donc 
 ## Configurer l’accès à YouTube
 
 1. Installez Caption Finder et ouvrez **Compte et réglages**.
-2. Sous **Compte du lecteur vidéo**, cliquez sur **1. Sign in to Google**, puis sur **2. Connect YouTube**, et choisissez votre chaîne si on vous le demande. Fermez la fenêtre du compte quand vous avez terminé.
+2. Sous **Compte du lecteur vidéo**, cliquez sur **1. Se connecter à Google**, puis sur **2. Connecter YouTube**, et choisissez votre chaîne si on vous le demande. Fermez la fenêtre du compte quand vous avez terminé.
 3. Sous **Authentification des téléchargements**, choisissez **Session YouTube de l’app**.
 
 Vous êtes prêt à utiliser Caption Finder.
@@ -100,9 +100,9 @@ Vous pouvez aussi garder **Anonyme**, mais les contrôles anti-robots de YouTube
 - **Channels :** saisissez un nom et une liste de chaînes correspondantes apparaît (Entrée l’affiche aussitôt). Cliquez sur l’une d’elles pour l’ajouter. Un lien de chaîne ou un `@handle` est ajouté directement, et un lien de vidéo collé propose la chaîne à laquelle elle appartient. Plusieurs chaînes sont parcourues l’une après l’autre, ou mélangées (une vidéo de chacune à tour de rôle) ; voir Account & Settings.
 - **Videos :** collez des liens de vidéos (watch, `youtu.be` ou Shorts), un ou plusieurs. Les vidéos listées sont parcourues dans l’ordre.
 
-Saisissez ensuite une **Phrase recherchée** et appuyez sur **Search**. Les résultats apparaissent au fur et à mesure, les plus récents d’abord, jusqu’à 25 vidéos. Cliquez sur l’un pour l’ouvrir ; chacun affiche la ligne correspondante et le nombre de correspondances de la vidéo.
+Saisissez ensuite une **Phrase recherchée** et appuyez sur **Rechercher**. Les résultats apparaissent au fur et à mesure, les plus récents d’abord, jusqu’à 25 vidéos. Cliquez sur l’un pour l’ouvrir ; chacun affiche la ligne correspondante et le nombre de correspondances de la vidéo.
 
-À droite : le lecteur, la ligne trouvée, une frise chronologique, **Set In / Set Out** avec marge et durée, **Precise Cut**, **Preview selection** et le nom du fichier. Choisissez un dossier de téléchargement et ajoutez la sélection à la file de téléchargement. La file permet la pause, la reprise, l’annulation, la nouvelle tentative et **Afficher le fichier**, qui affiche le fichier terminé dans l’Explorateur de fichiers sous Windows ou dans le Finder sous macOS.
+À droite : le lecteur, la ligne trouvée, une frise chronologique, **Définir l’entrée / Définir la sortie** avec marge et durée, **Precise Cut**, **Aperçu de la sélection** et le nom du fichier. Choisissez un dossier de téléchargement et ajoutez la sélection à la file de téléchargement. La file permet la pause, la reprise, l’annulation, la nouvelle tentative et **Afficher le fichier**, qui affiche le fichier terminé dans l’Explorateur de fichiers sous Windows ou dans le Finder sous macOS.
 
 Les **Presets** enregistrent une liste de chaînes ou de vidéos pour la retrouver. **Enregistrer le preset** est désactivé tant que la liste est vide. **Charger un preset** ouvre le dossier des presets pour choisir un fichier. Chaque mode a ses propres presets. Clic droit sur le nom d’un preset : Load, Add to current list, Show in Finder, Rename et Remove from list. Clic droit sur un espace vide : Clear files, Clear presets et Show presets folder. Retirer un preset de la ligne ne supprime jamais son fichier. Sous Windows, **Afficher dans le Finder** garde ce libellé mais ouvre l’Explorateur de fichiers avec le fichier de preset sélectionné, et **Afficher le dossier des presets** ouvre le dossier dans l’Explorateur de fichiers.
 
@@ -116,13 +116,13 @@ Les **Presets** enregistrent une liste de chaînes ou de vidéos pour la retrouv
 
 ### Account & Settings
 
-- **Video player account :** **1. Sign in to Google**, **2. Connect YouTube** (choisissez votre chaîne si on vous le demande) et **Check playback** ouvrent une fenêtre de compte distincte pour le lecteur. La connexion est conservée dans le stockage de navigateur propre à l’application. Sur YouTube, un avatar de compte confirme que vous êtes connecté, et son menu de compte permet de changer de compte ou de se déconnecter. Fermez la fenêtre quand vous avez terminé et relancez la recherche pour recharger le lecteur.
-- **Download authentication :** d’où les recherches de sous-titres et les téléchargements tirent leur connexion YouTube. Choisissez **Anonyme** (par défaut), **App's YouTube session**, un navigateur que l’application trouve sur cet ordinateur, ou **Importer des cookies Netscape…**. Les cookies ne sont jamais copiés dans les paramètres de l’application.
+- **Video player account :** **1. Se connecter à Google**, **2. Connecter YouTube** (choisissez votre chaîne si on vous le demande) et **Vérifier la lecture** ouvrent une fenêtre de compte distincte pour le lecteur. La connexion est conservée dans le stockage de navigateur propre à l’application. Sur YouTube, un avatar de compte confirme que vous êtes connecté, et son menu de compte permet de changer de compte ou de se déconnecter. Fermez la fenêtre quand vous avez terminé et relancez la recherche pour recharger le lecteur.
+- **Download authentication :** d’où les recherches de sous-titres et les téléchargements tirent leur connexion YouTube. Choisissez **Anonyme** (par défaut), **Session YouTube de l’app**, un navigateur que l’application trouve sur cet ordinateur, ou **Importer des cookies Netscape…**. Les cookies ne sont jamais copiés dans les paramètres de l’application.
   - **Windows :** Chrome, Edge, Firefox, Brave, Chromium, Vivaldi et Opera sont détectés.
   - **macOS :** Chrome, Opera, Vivaldi, Firefox, Safari et d’autres sont détectés.
 - **Sous Windows :**
   - Fermez complètement le navigateur, y compris ses processus d’arrière-plan, avant de chercher ou de télécharger avec ses cookies. Les navigateurs Chromium (Chrome, Edge, Opera, Brave, Vivaldi, Chromium) verrouillent leur fichier de cookies tant qu’ils tournent. Si l’application indique qu’elle n’a pas pu copier la base de cookies du navigateur, c’est la raison.
-  - Le chiffrement des cookies de Chromium sous Windows peut malgré tout empêcher l’extraction, et l’application ne le contourne jamais. Utilisez plutôt **App's YouTube session** ou **Importer des cookies Netscape…**.
+  - Le chiffrement des cookies de Chromium sous Windows peut malgré tout empêcher l’extraction, et l’application ne le contourne jamais. Utilisez plutôt **Session YouTube de l’app** ou **Importer des cookies Netscape…**.
   - L’application transmet à yt-dlp le proxy HTTP manuel du système (sans nom d’utilisateur ni mot de passe) et respecte `HTTP_PROXY` et `HTTPS_PROXY`. Un script PAC ou une liste d’exceptions contenant autre chose que des adresses locales n’est pas transmis.
   - Le dossier de téléchargement et un fichier de cookies importé sont enregistrés sous forme de chemins complets. Si une copie portable passe sur une autre lettre de lecteur, choisissez-les à nouveau.
   - Mettre un téléchargement en pause suspend son processus ; une longue pause peut donc amener YouTube à couper la connexion. La pause et la reprise ne survivent pas à un redémarrage de l’application.
@@ -130,7 +130,7 @@ Les **Presets** enregistrent une liste de chaînes ou de vidéos pour la retrouv
 - **Sous macOS :** les cookies de Chrome et de Firefox nécessitent l’**Accès complet au disque** (Full Disk Access) ; l’application ouvre une petite fenêtre d’aide avec une icône à faire glisser dans les Réglages Système (System Settings).
 - **Les noms de fichiers** que Windows ne peut pas enregistrer (noms réservés comme `CON` ou `NUL`, et caractères comme `? * | < >`) sont refusés sur toutes les plateformes, afin qu’un extrait puisse passer de l’une à l’autre.
 - **Vidéos à analyser par recherche** (par chaîne, 50 par défaut), **Résultats de plusieurs chaînes**, **Langue des sous-titres**, **Rechercher dans les sous-titres**.
-- **Don't play the first found video automatically**, et **Pendant le chargement d’une vidéo** (miniature ou indicateur de chargement).
+- **Ne pas lire automatiquement la première vidéo trouvée**, et **Pendant le chargement d’une vidéo** (miniature ou indicateur de chargement).
 
 ## Où sont conservées les données
 
