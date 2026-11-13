@@ -193,9 +193,11 @@ Rebuilding an app changes its ad-hoc signature, so macOS forgets its Full Disk A
 - `tools/installer/` builds the macOS installer: an installer package plus a disk image whose window walks through Open Anyway.
 - `docs/i18n/` holds this README in 19 other languages (the same ones as HomePad). `scripts/readme-languages.mjs` keeps the language chooser at the top of every page in sync, and `node scripts/readme-languages.mjs --check` verifies that each translation still has the same commands, file names, links and structure as this page. The Development section stays English-only.
 
-### Translating the README
+### Translating the app and the README
 
-The translations were written by an AI and have not been reviewed by native speakers. The app itself is English-only, so button and menu names stay in English in every translation, and Windows and macOS's own labels are translated with the English in brackets. To add a language, add a row to `LANGUAGES` in `scripts/readme-languages.mjs`, write `docs/i18n/README.<code>.md` with the two `<!-- languages:... -->` markers at the top (copy another language's file as the template), then run `node scripts/readme-languages.mjs` and `node scripts/readme-languages.mjs --check`. When this README's user-facing sections change, update the translations too; the check reports what has drifted.
+The app's own interface is translated into the same 20 languages and follows the system language; Account & Settings → Language overrides it. How that works, how to add or fix a translation, and the checks are in [docs/LOCALIZATION.md](docs/LOCALIZATION.md) (`node scripts/i18n.mjs check`).
+
+The translations were written by an AI and have not been reviewed by native speakers. The app itself now comes in the same languages (see [docs/LOCALIZATION.md](docs/LOCALIZATION.md)), but these pages still show the English button and menu names, and Windows and macOS's own labels are translated with the English in brackets. To add a language, add a row to `LANGUAGES` in `scripts/readme-languages.mjs`, write `docs/i18n/README.<code>.md` with the two `<!-- languages:... -->` markers at the top (copy another language's file as the template), then run `node scripts/readme-languages.mjs` and `node scripts/readme-languages.mjs --check`. When this README's user-facing sections change, update the translations too; the check reports what has drifted.
 
 `docs/DEPENDENCIES.md` lists the third-party tools and their licenses. The other files in `docs/` come from the project this was forked from and still describe it (see [Credits](#credits)).
 

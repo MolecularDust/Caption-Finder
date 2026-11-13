@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import appIcon from "./assets/app-icon.png?inline";
+import { t, tx, tb } from "./i18n";
 
 /**
  * Small window shown beside System Settings. macOS has no prompt for Full Disk Access and
@@ -21,7 +22,7 @@ export default function GrantHelper() {
     setError("");
     // The plugin wants the icon as a full "data:image/png;base64,…" string, prefix included.
     startDrag({ item: [bundle], icon: appIcon }).catch((err) =>
-      setError(String(err)),
+      setError(tb(String(err))),
     );
   };
   return (
@@ -29,17 +30,16 @@ export default function GrantHelper() {
       <div className="helper-bar" data-tauri-drag-region>
         <button
           className="helper-close"
-          aria-label="Close"
+          aria-label={t("Close")}
           onClick={() => void invoke("close_grant_helper")}
         >
           ✕
         </button>
       </div>
-      <strong>Turn on Caption Finder in this list</strong>
+      <strong>{t("Turn on Caption Finder in this list")}</strong>
       {bundle === null ? (
         <p>
-          This copy isn’t a packaged app, so it can’t be added. Open the
-          installed Caption Finder and try again.
+          {t("This copy isn’t a packaged app, so it can’t be added. Open the installed Caption Finder and try again.")}
         </p>
       ) : (
         <>
@@ -49,15 +49,16 @@ export default function GrantHelper() {
             alt="Caption Finder"
             draggable
             onDragStart={drag}
-            title="Drag into the list"
+            title={t("Drag into the list")}
           />
           <p>
-            Not in the list? Drag this icon into it, then switch it on. When
-            macOS asks, choose <em>Quit &amp; Reopen</em>.
+            {tx(
+              "Not in the list? Drag this icon into it, then switch it on. When macOS asks, choose {quit}.",
+              { quit: <em>{t("Quit & Reopen")}</em> },
+            )}
           </p>
           <p>
-            Already listed but still blocked? That entry belongs to an older
-            build: select it, press − under the list, then drag this icon in.
+            {t("Already listed but still blocked? That entry belongs to an older build: select it, press − under the list, then drag this icon in.")}
           </p>
         </>
       )}
