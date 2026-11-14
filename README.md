@@ -71,8 +71,6 @@ Get the setup from the [releases page](https://github.com/MolecularDust/Caption-
 
 To uninstall a normal install, use **Apps & features**. Your settings and sign-in data stay in your user profile.
 
-You can also download `Caption-Finder-Windows-Portable.zip` from the same page. Extract the whole ZIP to a folder first, then run `Caption Finder.exe`. Do not run it from inside the ZIP.
-
 ## Install (macOS)
 
 Get `Caption-Finder-Installer.dmg` from the [latest release](https://github.com/MolecularDust/Caption-Finder/releases) and open it. The window shows the steps:
