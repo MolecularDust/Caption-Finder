@@ -4,7 +4,7 @@
 
 Repository: https://github.com/MolecularDust/Youglish-Downloader
 
-GitHub is the shared source of truth. Each agent uses an independent folder and branch. The user’s main working folder is currently `/Users/mike/Documents/Youglish Downloader`; this path is local context, not a requirement for other machines.
+GitHub is the shared source of truth. Each agent uses an independent folder and branch. The maintainer's working folder is a local path; it is not a requirement for other machines.
 
 Agent A continues development and integrates changes when asked. Agent B can review or implement a scoped task. Give each agent its task and identify files likely to overlap. Agree who runs the desktop app when sharing a machine; separate Git folders do not isolate the app’s saved account session.
 

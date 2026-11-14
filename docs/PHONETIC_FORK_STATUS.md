@@ -20,7 +20,7 @@ Current app: `src-tauri/target/debug/bundle/macos/YouGlish Downloader.app`. The 
 
 # PhoneticCutter verification — 21 October 2026
 
-Forked from the clean local TubeCutter checkout at `/Users/mike/Documents/video-downloader`, upstream commit `b179193d2a4e0575c7cc49f2c8d6161c46b99cbd`. The original application was not edited. The new source and local evaluation app are in this project folder. Product name: PhoneticCutter; identifier: `com.mike.phoneticcutter`.
+Forked from a clean local TubeCutter checkout, upstream commit `b179193d2a4e0575c7cc49f2c8d6161c46b99cbd`. The original application was not edited. The new source and local evaluation app are in this project folder. Product name: PhoneticCutter; identifier: `com.mike.phoneticcutter`.
 
 ## Implemented
 
@@ -159,5 +159,5 @@ Frontend tests (27), Rust tests (19), lint and macOS debug bundle passed. Native
 - Runtime-only Arc guard retains each private temporary Netscape file through the operation/queue and removes it afterward. Cookie values and temporary paths are not serialized into settings. Unix files created with 0600; abrupt process termination can leave a temporary file (normal completion/failure/cancel release their guards).
 - Corrected Wry cookies_for_url exact-domain filtering by reading the store then applying a strict youtube.com domain filter locally. No cookie values logged.
 - Live lookup: Di0X3qWYAR8 supplied English captions found 1115.825–1118.075; padded selection 6.25s.
-- Live download completed: /Users/mike/Documents/Weak Forms/Pronouns/you/App session test 2026-10-31.mp4. ffprobe confirmed audio + 1280x720 video, 6.269 seconds, 746803 bytes. No temporary session files remained.
+- Live download completed: a local test file (2026-10-31). ffprobe confirmed audio + 1280x720 video, 6.269 seconds, 746803 bytes. No temporary session files remained.
 - Validation: 21 Rust tests, 27 frontend tests, lint, frontend/native build passed. App-session authentication remains selected. Browser imports retained as optional fallback. Windows permissions/runtime behavior not yet tested.
