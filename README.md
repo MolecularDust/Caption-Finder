@@ -53,6 +53,11 @@ Type a phrase, point the app at one channel, several channels, or a list of vide
 
 > Download only content you own or have permission to download.
 
+## Download
+
+- **Windows:** [Download the latest release](https://github.com/MolecularDust/Caption-Finder/releases/latest). Run the setup and choose a regular install or a portable copy.
+- **macOS:** [Download the latest release](https://github.com/MolecularDust/Caption-Finder/releases/latest).
+
 ## Install (Windows)
 
 Get the setup from the [releases page](https://github.com/MolecularDust/Caption-Finder/releases): `Caption-Finder-Setup_<version>_x64.exe`. It needs Windows 11 on an x64 PC. The WebView2 runtime that the app uses is included in Windows 11.
@@ -65,8 +70,6 @@ Get the setup from the [releases page](https://github.com/MolecularDust/Caption-
 4. Click **Install**, then **Finish**.
 
 To uninstall a normal install, use **Apps & features**. Your settings and sign-in data stay in your user profile.
-
-You can also download `Caption-Finder-Windows-Portable.zip` from the same page. Extract the whole ZIP to a folder first, then run `Caption Finder.exe`. Do not run it from inside the ZIP.
 
 ## Install (macOS)
 
