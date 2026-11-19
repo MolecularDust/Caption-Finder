@@ -77,6 +77,7 @@ fn yt_dlp(s: &Settings, legacy_http: bool) -> Result<std::process::Command, Stri
         "--ignore-config",
         "--no-playlist",
         "--no-warnings",
+        "--no-check-formats",
         "--socket-timeout",
         "20",
         "--retries",
