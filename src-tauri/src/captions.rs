@@ -97,42 +97,11 @@ pub fn retrieve(
     }
     // Full extraction, formats included: the caller caches this metadata so a later preview or
     // download of the video can reuse it. Only the HTTP handler differs from a download.
-    let dir = TempDir(cache.join(uuid::Uuid::new_v4().to_string()));
-    std::fs::create_dir_all(&dir.0).map_err(|_| "Cannot create temporary subtitle folder")?;
-    // Private temporary directory: metadata/subtitles may contain authenticated URLs.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&dir.0, std::fs::Permissions::from_mode(0o700))
-            .map_err(|_| "Cannot secure temporary subtitle folder")?;
-    }
-    let template = dir.0.join("captions.%(ext)s");
-    let sub_langs = format!("{language}.*,{language}-orig,{language}");
     let mut c = metadata_base(&settings)?;
     if cfg!(debug_assertions) {
         c.arg("--verbose"); // development builds only: makes yt-dlp print its phases for timing
     }
-    c.args([
-        "--dump-single-json",
-        "--no-simulate",
-        "--skip-download",
-        "--sub-format",
-        "json3",
-        "--sub-langs",
-        &sub_langs,
-    ]);
-    match source.as_str() {
-        "manual" => {
-            c.arg("--write-subs");
-        }
-        "automatic" => {
-            c.arg("--write-auto-subs");
-        }
-        _ => {
-            c.args(["--write-subs", "--write-auto-subs"]);
-        }
-    }
-    let (o, trace) = crate::timing::run(c.arg("-o").arg(&template).arg("--").arg(&normalized))
+    let (o, trace) = crate::timing::run(c.args(["--dump-single-json", "--skip-download", "--", &normalized]))
         .map_err(|_| "Cannot start caption worker")?;
     crate::diagnostics::log_timed(
         crate::diagnostics::Stage::CaptionMetadata,
@@ -161,17 +130,60 @@ pub fn retrieve(
         "automatic" => "No original automatic captions in this language. Translations are not used.",
         _ => "No supplied or original automatic captions in this language. Translations are not used.",
     })?;
-    let preferred = dir.0.join(format!("captions.{code}.json3"));
-    let path = if preferred.is_file() {
-        preferred
+    let dir = TempDir(cache.join(uuid::Uuid::new_v4().to_string()));
+    std::fs::create_dir_all(&dir.0).map_err(|_| "Cannot create temporary subtitle folder")?;
+    // Reuse the extraction, including signed caption URLs and request headers.
+    // Private temporary directory: metadata may contain authenticated URLs.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir.0, std::fs::Permissions::from_mode(0o700))
+            .map_err(|_| "Cannot secure temporary subtitle folder")?;
+    }
+    let info = dir.0.join("video.info.json");
+    std::fs::write(
+        &info,
+        serde_json::to_vec(&v).map_err(|_| "Invalid metadata")?,
+    )
+    .map_err(|_| "Cannot save temporary metadata")?;
+    let template = dir.0.join("captions.%(ext)s");
+    let mut c = metadata_base(&settings)?;
+    c.args([
+        "--skip-download",
+        "--sub-format",
+        "json3",
+        "--sub-langs",
+        &code,
+    ]);
+    c.arg(if automatic {
+        "--write-auto-subs"
     } else {
-        std::fs::read_dir(&dir.0)
-            .map_err(|_| "No subtitle output")?
-            .flatten()
-            .map(|e| e.path())
-            .find(|p| p.extension().is_some_and(|e| e == "json3"))
-            .ok_or("No usable subtitle file")?
-    };
+        "--write-subs"
+    });
+    if cfg!(debug_assertions) {
+        c.arg("--verbose");
+    }
+    let (o, trace) = crate::timing::run(c.arg("-o").arg(template).arg("--load-info-json").arg(&info))
+        .map_err(|_| "Cannot retrieve captions")?;
+    crate::diagnostics::log_timed(
+        crate::diagnostics::Stage::Captions,
+        &settings,
+        o.status.code(),
+        &String::from_utf8_lossy(&o.stderr),
+        &trace,
+    );
+    if !o.status.success() {
+        return Err(format!(
+            "Caption request: {}",
+            safe_error(&String::from_utf8_lossy(&o.stderr))
+        ));
+    }
+    let path = std::fs::read_dir(&dir.0)
+        .map_err(|_| "No subtitle output")?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|e| e == "json3"))
+        .ok_or("No usable subtitle file")?;
     Ok((assemble(&v, &normalized, code, automatic, &path)?, raw))
 }
 
