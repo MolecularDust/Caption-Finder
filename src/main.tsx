@@ -50,6 +50,7 @@ import {
   type ChannelPreset,
   type ChannelSuggestion,
 } from "./channels";
+import { t, tx, tb, initLanguage, useLanguage, setLanguageChoice, getLanguageChoice, languageName, LANGUAGES } from "./i18n";
 import { LANGUAGE_CHOICES, captionLanguages } from "./languages";
 import { ResultsList, Highlight } from "./results";
 import GrantHelper from "./GrantHelper";
@@ -59,6 +60,15 @@ const RESULT_SLOTS = 25;
 const DEFAULT_SCAN = 50;
 const MAX_SCAN = 1000;
 const validScan = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_SCAN;
+// Plain text for an error, translated when it is one of the Rust side’s known messages.
+// A caption language's name in the current language, from the browser's own language data.
+const captionLanguageName = (codes: string, english: string) => {
+  const first = codes.split(",")[0].replace("zh-Hans", "zh");
+  const name = languageName(first);
+  return name && name !== first ? name : english;
+};
+const rawError = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errText = (e: unknown) => tb(rawError(e));
 type SearchStatus = {
   state: "idle" | "running" | "done" | "error";
   scanned: number;
@@ -67,21 +77,31 @@ type SearchStatus = {
   message?: string;
 };
 function searchStatusText(s: SearchStatus, mode: SearchMode = "channels"): string {
+  const scanned = { scanned: s.scanned };
   if (s.state === "running")
-    return `Searching… checked ${s.scanned} videos, ${s.found} with matches`;
-  if (s.state === "error") return s.message ?? "The search failed.";
+    return t(
+      "Searching… checked {scanned, plural, one {# video} other {# videos}}, {found} with matches",
+      { scanned: s.scanned, found: s.found },
+    );
+  if (s.state === "error") return s.message ? tb(s.message) : t("The search failed.");
   if (s.state !== "done")
     return mode === "videos"
-      ? "Add videos and a phrase, then search."
-      : "Enter a channel and a phrase, then search.";
-  if (s.reason === "blocked") return s.message ?? "The search was stopped.";
+      ? t("Add videos and a phrase, then search.")
+      : t("Enter a channel and a phrase, then search.");
+  if (s.reason === "blocked") return s.message ? tb(s.message) : t("The search was stopped.");
   if (!s.found)
-    return `No matches in ${s.scanned} videos. Try a shorter phrase.`;
-  const found = `${s.found} ${s.found === 1 ? "video" : "videos"}, newest first`;
+    return t(
+      "No matches in {scanned, plural, one {# video} other {# videos}}. Try a shorter phrase.",
+      scanned,
+    );
+  const found = t("{found, plural, one {# video} other {# videos}}, newest first", {
+    found: s.found,
+  });
   if (s.reason === "exhausted")
-    return `${found} · checked all ${s.scanned} videos`;
-  if (s.reason === "cap") return `${found} · stopped after ${s.scanned} videos`;
-  return `${found} · checked ${s.scanned}`;
+    return `${found} · ${t("checked all {scanned, plural, one {# video} other {# videos}}", scanned)}`;
+  if (s.reason === "cap")
+    return `${found} · ${t("stopped after {scanned, plural, one {# video} other {# videos}}", scanned)}`;
+  return `${found} · ${t("checked {scanned}", scanned)}`;
 }
 const defaults: Settings = {
   destination: "",
@@ -91,6 +111,7 @@ const defaults: Settings = {
   playFirstResult: false,
 };
 function App() {
+  useLanguage(); // draw the window again when the language changes
   const [settings, setSettings] = useState<Settings>(defaults),
     [showSettings, setShowSettings] = useState(false),
     [browsers, setBrowsers] = useState<string[]>([]),
@@ -297,14 +318,14 @@ function App() {
       setNameFix(null);
       await fn();
     } catch (e) {
-      setError(String(e));
+      setError(errText(e));
     }
   };
   useEffect(() => {
     if (!isTauri()) {
       setOrigin(window.location.origin);
       setMatchStatus(
-        "Browser preview: open the desktop app for subtitle matching and downloads.",
+        t("Browser preview: open the desktop app for subtitle matching and downloads."),
       );
       return;
     }
@@ -315,13 +336,13 @@ function App() {
       .catch(() => setBrowsers([]));
     invoke<Settings>("get_settings")
       .then(setSettings)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errText(e)));
     invoke<string>("player_origin")
       .then(setOrigin)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errText(e)));
     invoke<Job[]>("jobs")
       .then((loaded) => setJobs(clearQueueRows(loaded, clearedJobIds.current)))
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errText(e)));
     listen<Job>("job", (e) =>
       setJobs((old) => updateQueue(old, e.payload, clearedJobIds.current)),
     )
@@ -329,7 +350,7 @@ function App() {
         if (disposed) fn();
         else dispose = fn;
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(errText(e)));
     return () => {
       disposed = true;
       dispose?.();
@@ -381,10 +402,15 @@ function App() {
       setPreviewActive(false);
       setPlayerError(
         value === 153
-          ? "YouTube rejected the player identity (error 153)."
+          ? t("YouTube rejected the player identity (error 153).")
           : [101, 150].includes(value)
-            ? `YouTube’s embedded player won’t run here (error ${value}). That is usually a sign-in check, not a restriction by the video’s owner. A local preview is used instead.`
-            : `YouTube player error ${value}. A local preview is used instead.`,
+            ? t(
+                "YouTube’s embedded player won’t run here (error {code}). That is usually a sign-in check, not a restriction by the video’s owner. A local preview is used instead.",
+                { code: value },
+              )
+            : t("YouTube player error {code}. A local preview is used instead.", {
+                code: value,
+              }),
       );
       if (!local && localStatus !== "loading") void loadLocalPreview();
     }
@@ -428,7 +454,7 @@ function App() {
       setLocalStatus("");
       setPlayerError("");
     } catch (e) {
-      if (candidateRef.current === id) setLocalStatus(`error:${String(e)}`);
+      if (candidateRef.current === id) setLocalStatus(`error:${errText(e)}`);
     }
   };
   const setIn = () => setStart(Math.max(0, Math.min(time, end - 0.01)));
@@ -471,7 +497,7 @@ function App() {
     setTime(m.start);
     if (ready) send("seek", Math.max(0, m.start - padding));
     setMatchStatus(
-      "Matched subtitle segment boundaries. Adjust In/Out as needed.",
+      t("Matched subtitle segment boundaries. Adjust In/Out as needed."),
     );
   };
   const matchFilename = (phrase?: string, selectedId?: string) =>
@@ -480,7 +506,7 @@ function App() {
         id = selectedId ?? candidateRef.current;
       if (!id || !text) return;
       if (!isTauri()) {
-        setMatchStatus("Open the desktop app to retrieve and match subtitles.");
+        setMatchStatus(t("Open the desktop app to retrieve and match subtitles."));
         return;
       }
       const request = ++matchRequest.current;
@@ -490,7 +516,7 @@ function App() {
       );
       setBusy(true);
       setMetadataLoading(true);
-      setMatchStatus("Retrieving subtitles…");
+      setMatchStatus(t("Retrieving subtitles…"));
       try {
         let cached = captionCache.current.get(cacheKey);
         if (!cached) {
@@ -519,7 +545,7 @@ function App() {
           return;
         const v = cached.video;
         if (!v.duration || !Number.isFinite(v.duration))
-          throw Error("Choose a finished video with a finite duration.");
+          throw Error(t("Choose a finished video with a finite duration."));
         captionCues.current = cached.track.cues;
         const found = findSubtitleMatches(cached.track.cues, text);
         setVideo(v);
@@ -530,21 +556,23 @@ function App() {
         if (found.length === 1) selectMatch(found[0], v);
         else if (found.length) {
           setMatchStatus(
-            `${found.length} matches — choose the occurrence you want.`,
+            t("{count, plural, one {# match} other {# matches}} — choose the occurrence you want.", { count: found.length }),
           );
           setPickerOpen(true);
         } else
           setMatchStatus(
-            "No subtitle match. Timings were not changed; edit the phrase or set In/Out manually.",
+            t("No subtitle match. Timings were not changed; edit the phrase or set In/Out manually."),
           );
         if (found.length === 1)
           setMatchStatus(
-            `${cached.track.kind} captions · ${cached.track.language}. Subtitle segment boundaries found; adjust In/Out as needed.`,
+            cached.track.kind.includes("automatic")
+              ? t("Original automatic captions · {language}. Subtitle segment boundaries found; adjust In/Out as needed.", { language: cached.track.language })
+              : t("Supplied captions · {language}. Subtitle segment boundaries found; adjust In/Out as needed.", { language: cached.track.language }),
           );
       } catch (e) {
         if (request === matchRequest.current) {
           setMatchStatus(
-            "Subtitle matching failed. You can set In/Out manually, or edit the phrase and retry.",
+            t("Subtitle matching failed. You can set In/Out manually, or edit the phrase and retry."),
           );
           throw e;
         }
@@ -625,7 +653,6 @@ function App() {
   videosRef.current = videos;
   // The list being searched: channels or videos, depending on the mode.
   const items = searchMode === "videos" ? videos : channels;
-  const noun = searchMode === "videos" ? "video" : "channel";
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -911,7 +938,7 @@ function App() {
     const cached = lookupCache.current.get(key);
     if (cached && Date.now() - cached.at < 5 * 60 * 1000) {
       setSuggestions(cached.found);
-      setChannelNote(cached.found.length ? "" : "No channels found.");
+      setChannelNote(cached.found.length ? "" : t("No channels found."));
       setSuggesting(false);
       return;
     }
@@ -932,12 +959,12 @@ function App() {
             if (request !== suggestRequest.current) return;
             lookupCache.current.set(key, { at: Date.now(), found });
             setSuggestions(found);
-            setChannelNote(found.length ? "" : "No channels found.");
+            setChannelNote(found.length ? "" : t("No channels found."));
           })
           .catch((e) => {
             if (request === suggestRequest.current) {
               setSuggestions([]);
-              setChannelNote(String(e));
+              setChannelNote(errText(e));
             }
           })
           .finally(() => {
@@ -960,7 +987,7 @@ function App() {
   const addVideos = (text: string) => {
     const links = parseVideoLinks(text);
     if (!links.length) {
-      setChannelNote("Paste a YouTube video link (watch, youtu.be or shorts).");
+      setChannelNote(t("Paste a YouTube video link (watch, youtu.be or shorts)."));
       return;
     }
     setChannelNote("");
@@ -998,7 +1025,7 @@ function App() {
         .catch((e) => {
           // A link that can't be read is dropped, with the reason.
           setVideos((old) => old.filter((v) => v.source !== l.source));
-          setChannelNote(`${l.source}: ${String(e)}`);
+          setChannelNote(`${l.source}: ${errText(e)}`);
         });
   };
   const submitChannelText = () => {
@@ -1039,10 +1066,10 @@ function App() {
         : "";
   const enterHintLabel =
     searchMode === "videos"
-      ? "Add this video"
+      ? t("Add this video")
       : looksLikeChannel(channelText)
-        ? "Add this channel"
-        : "Show matching channels";
+        ? t("Add this channel")
+        : t("Show matching channels");
   // Switching between searching channels and searching videos starts from a clean slate: the
   // results belong to the old list, and each mode keeps its own list and presets.
   const switchMode = (next: SearchMode) => {
@@ -1112,11 +1139,11 @@ function App() {
         message:
           searchMode === "videos"
             ? pending
-              ? "Paste a YouTube video link, then press Enter to add it."
-              : "Add at least one video to search."
+              ? t("Paste a YouTube video link, then press Enter to add it.")
+              : t("Add at least one video to search.")
             : pending
-              ? "Pick a channel from the suggestions first."
-              : "Add at least one channel to search.",
+              ? t("Pick a channel from the suggestions first.")
+              : t("Add at least one channel to search."),
       });
       return;
     }
@@ -1125,7 +1152,7 @@ function App() {
         state: "error",
         scanned: 0,
         found: 0,
-        message: "Open the desktop app to search.",
+        message: t("Open the desktop app to search."),
       });
       return;
     }
@@ -1219,7 +1246,7 @@ function App() {
         });
     } catch (e) {
       if (searchAbort.current === control)
-        setSearchStatus((old) => ({ ...old, state: "error", message: String(e) }));
+        setSearchStatus((old) => ({ ...old, state: "error", message: rawError(e) }));
     }
   };
   const cancelSearch = () => {
@@ -1293,11 +1320,11 @@ function App() {
   const enqueue = () =>
     act(async () => {
       if (!video || !selectionValid)
-        throw Error("Select a valid video section.");
+        throw Error(t("Select a valid video section."));
       if (fileNameEdited && fileNameNeedsFix(fileName)) {
         setNameFix({ original: fileName, proposed: safeFileName(fileName) });
         setError(
-          "This file name contains unsupported characters, is empty, or is too long. Review the suggested name below.",
+          t("This file name contains unsupported characters, is empty, or is too long. Review the suggested name below."),
         );
         return;
       }
@@ -1350,7 +1377,7 @@ function App() {
           <img className="app-icon" src={appIcon} alt="" />
           <div>
             <strong>Caption Finder</strong>
-            <small>Find the line. Keep the moment.</small>
+            <small>{t("Find the line. Keep the moment.")}</small>
           </div>
         </div>
         <div className="header-actions">
@@ -1358,12 +1385,12 @@ function App() {
             ●{" "}
             {settings.browser || settings.cookiesFile
               ? settings.browser === "app"
-                ? "App session"
-                : "Browser session"
-              : "Anonymous"}
+                ? t("App session")
+                : t("Browser session")
+              : t("Anonymous")}
           </span>
           <button onClick={() => setShowSettings(true)}>
-            ◎ <span>Account & Settings</span>
+            ◎ <span>{t("Account & Settings")}</span>
           </button>
         </div>
       </header>
@@ -1380,8 +1407,8 @@ function App() {
             setAreaMenu({ x: e.clientX, y: e.clientY });
           }}
         >
-          <div className="mode-switch" role="group" aria-label="Search across">
-            <span className="mode-label">Search across</span>
+          <div className="mode-switch" role="group" aria-label={t("Search across")}>
+            <span className="mode-label">{t("Search across")}</span>
             <div className="mode-buttons">
               {(["channels", "videos"] as SearchMode[]).map((m) => (
                 <button
@@ -1391,7 +1418,7 @@ function App() {
                   aria-pressed={searchMode === m}
                   onClick={() => switchMode(m)}
                 >
-                  {m === "channels" ? "Channels" : "Videos"}
+                  {m === "channels" ? t("Channels") : t("Videos")}
                 </button>
               ))}
             </div>
@@ -1406,8 +1433,13 @@ function App() {
             <div className="channel-box">
               <label className="field" htmlFor="channel">
                 <span>
-                  YouTube {noun}
-                  {items.length > 0 ? "s" : ""}
+                  {searchMode === "videos"
+                    ? items.length > 0
+                      ? t("YouTube videos")
+                      : t("YouTube video")
+                    : items.length > 0
+                      ? t("YouTube channels")
+                      : t("YouTube channel")}
                 </span>
                 <input
                   id="channel"
@@ -1441,11 +1473,11 @@ function App() {
                   placeholder={
                     searchMode === "videos"
                       ? items.length
-                        ? "Add another video link"
-                        : "Paste a YouTube video link"
+                        ? t("Add another video link")
+                        : t("Paste a YouTube video link")
                       : items.length
-                        ? "Add another channel"
-                        : "Channel name, link or @handle"
+                        ? t("Add another channel")
+                        : t("Channel name, link or @handle")
                   }
                 />
               </label>
@@ -1476,14 +1508,14 @@ function App() {
                 (suggesting || suggestions.length > 0 || channelNote) && (
                 <ul className="suggestions" role="listbox">
                   {suggestions.length > 0 && lookingUpVideo && (
-                    <li className="note">Channel of this video:</li>
+                    <li className="note">{t("Channel of this video:")}</li>
                   )}
                   {suggesting && (
                     <li className="note looking">
                       <span className="spinner" aria-hidden="true" />
                       {lookingUpVideo
-                        ? "Finding this video’s channel"
-                        : "Looking up channels"}
+                        ? t("Finding this video’s channel")
+                        : t("Looking up channels")}
                       <span className="dots" aria-hidden="true" />
                     </li>
                   )}
@@ -1518,7 +1550,7 @@ function App() {
             </div>
             <div className="phrase-group">
               <label className="field" htmlFor="phrase">
-                <span>Search phrase</span>
+                <span>{t("Search phrase")}</span>
                 <input
                   id="phrase"
                   autoCapitalize="none"
@@ -1526,7 +1558,7 @@ function App() {
                   spellCheck={false}
                   value={phrase}
                   onChange={(e) => setPhrase(e.target.value)}
-                  placeholder="Enter a word or phrase"
+                  placeholder={t("Enter a word or phrase")}
                   required
                 />
               </label>
@@ -1538,7 +1570,7 @@ function App() {
                   onClick={cancelSearch}
                 >
                   <span className="spinner" aria-hidden="true" />
-                  Stop
+                  {t("Stop")}
                 </button>
               ) : (
                 <button
@@ -1546,14 +1578,14 @@ function App() {
                   className="primary search-button"
                   type="submit"
                 >
-                  Search →
+                  {t("Search →")}
                 </button>
               )}
             </div>
           </form>
           {(
-            <div className="preset-row" aria-label={`Presets of ${noun}s`}>
-              <span className="preset-label">Presets</span>
+            <div className="preset-row" aria-label={searchMode === "videos" ? t("Presets of videos") : t("Presets of channels")}>
+              <span className="preset-label">{t("Presets")}</span>
               {presets
                 .filter((p) => (shownPresets ?? []).includes(p.file ?? p.name))
                 .map((p) => (
@@ -1605,7 +1637,7 @@ function App() {
                   )}
                   <button
                     type="button"
-                    aria-label={`Remove preset ${p.name} from the list`}
+                    aria-label={t("Remove preset {name} from the list", { name: p.name })}
                     onClick={() => hidePreset(p)}
                   >
                     ×
@@ -1620,18 +1652,18 @@ function App() {
                     disabled={items.length === 0}
                     onClick={() => setPresetName("")}
                   >
-                    Save preset
+                    {t("Save preset")}
                   </button>
                 ) : replaceAsk ? (
                   <span className="preset-form">
                     <span className="preset-note">
-                      A preset named “{replaceAsk}” already exists.
+                      {t("A preset named “{name}” already exists.", { name: replaceAsk })}
                     </span>
                     <button type="button" onClick={() => void savePreset(true)}>
-                      Replace it
+                      {t("Replace it")}
                     </button>
                     <button type="button" onClick={() => setReplaceAsk(null)}>
-                      Choose another name
+                      {t("Choose another name")}
                     </button>
                   </span>
                 ) : (
@@ -1639,7 +1671,7 @@ function App() {
                     <input
                       autoFocus
                       value={presetName}
-                      placeholder="Preset name"
+                      placeholder={t("Preset name")}
                       onChange={(e) => setPresetName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -1653,10 +1685,10 @@ function App() {
                       disabled={!presetName.trim()}
                       onClick={() => void savePreset()}
                     >
-                      Save
+                      {t("Save")}
                     </button>
                     <button type="button" onClick={() => setPresetName(null)}>
-                      Cancel
+                      {t("Cancel")}
                     </button>
                   </span>
                 ))}
@@ -1665,12 +1697,12 @@ function App() {
                 className="preset-save"
                 onClick={() => void importPreset()}
               >
-                Load preset
+                {t("Load preset")}
               </button>
             </div>
           )}
           {items.length > 0 && (
-            <div className="channel-chips" aria-label={`${noun}s to search`}>
+            <div className="channel-chips" aria-label={searchMode === "videos" ? t("Videos to search") : t("Channels to search")}>
               {items.map((c) => (
                 <span
                   className={c.loading ? "chip loading" : "chip"}
@@ -1710,7 +1742,7 @@ function App() {
                 disabled={items.length === 0}
                 onClick={() => removeChannels(items)}
               >
-                Clear files
+                {t("Clear files")}
               </button>
             </li>
             <li>
@@ -1719,7 +1751,7 @@ function App() {
                 disabled={!(shownPresets ?? []).length}
                 onClick={() => updateShown([])}
               >
-                Clear presets
+                {t("Clear presets")}
               </button>
             </li>
             <li>
@@ -1729,7 +1761,7 @@ function App() {
                   act(() => invoke("show_presets_folder", { kind: searchMode }))
                 }
               >
-                Show presets folder
+                {t("Show presets folder")}
               </button>
             </li>
           </ul>
@@ -1749,12 +1781,12 @@ function App() {
                   )
                 }
               >
-                Remove
+                {t("Remove")}
               </button>
             </li>
             <li>
               <button role="menuitem" onClick={() => removeChannels(items)}>
-                Remove all
+                {t("Remove all")}
               </button>
             </li>
           </ul>
@@ -1773,7 +1805,7 @@ function App() {
                   if (p) loadPreset(p);
                 }}
               >
-                Load
+                {t("Load")}
               </button>
             </li>
             <li>
@@ -1784,7 +1816,7 @@ function App() {
                   if (p) addPreset(p);
                 }}
               >
-                Add to current list
+                {t("Add to current list")}
               </button>
             </li>
             <li>
@@ -1794,7 +1826,7 @@ function App() {
                   act(() => invoke("reveal_preset", { file: presetMenu.file, kind: searchMode }))
                 }
               >
-                Show in Finder
+                {t("Show in Finder")}
               </button>
             </li>
             <li>
@@ -1808,7 +1840,7 @@ function App() {
                   })
                 }
               >
-                Rename
+                {t("Rename")}
               </button>
             </li>
             <li>
@@ -1819,20 +1851,20 @@ function App() {
                   if (p) hidePreset(p);
                 }}
               >
-                Remove from list
+                {t("Remove from list")}
               </button>
             </li>
           </ul>
         )}
         <div className="panes">
-          <section className="results-card" aria-label="Matching videos">
+          <section className="results-card" aria-label={t("Matching videos")}>
             <div className="video-info">
               <div>
-                <span className="eyebrow">RESULTS</span>
+                <span className="eyebrow">{t("RESULTS")}</span>
                 <h2>
                   {results.length
-                    ? `${results.length} ${results.length === 1 ? "video" : "videos"} with “${searchedPhrase}”`
-                    : "Matching videos"}
+                    ? t("{count, plural, one {# video} other {# videos}} with “{phrase}”", { count: results.length, phrase: searchedPhrase })
+                    : t("Matching videos")}
                 </h2>
                 <p
                   className={
@@ -1847,7 +1879,7 @@ function App() {
                       className="inline-action"
                       onClick={() => act(() => invoke("open_privacy_settings"))}
                     >
-                      Open privacy settings
+                      {t("Open privacy settings")}
                     </button>
                   )}{" "}
                   {/denied access|cookies/i.test(searchStatus.message ?? "") && (
@@ -1856,7 +1888,7 @@ function App() {
                       className="inline-action"
                       onClick={() => setShowSettings(true)}
                     >
-                      Open Account & Settings
+                      {t("Open Account & Settings")}
                     </button>
                   )}
                 </p>
@@ -1876,14 +1908,14 @@ function App() {
           <section className="video-card">
           <div className="video-info">
             <div>
-              <span className="eyebrow">VIDEO</span>
+              <span className="eyebrow">{t("VIDEO")}</span>
               <h2>
-                {video?.title ?? "Watch, adjust, and keep your example."}
+                {video?.title ?? t("Watch, adjust, and keep your example.")}
               </h2>
               <p>
                 {video
                   ? `${video.channel} · ${timestamp(video.duration)}`
-                  : "Select a search result to load its video."}
+                  : t("Select a search result to load its video.")}
               </p>
             </div>
           </div>
@@ -1915,7 +1947,7 @@ function App() {
                 onPause={() => playerEvent.current("state", 2)}
                 onEnded={() => playerEvent.current("state", 0)}
                 onError={() =>
-                  setLocalStatus("error:The preview file could not be played.")
+                  setLocalStatus(`error:${t("The preview file could not be played.")}`)
                 }
               />
             ) : candidate && origin ? (
@@ -1940,7 +1972,7 @@ function App() {
               <iframe
                 className={ready || playerError ? "player-live" : "player-loading"}
                 ref={iframe}
-                title="YouTube player"
+                title={t("YouTube player")}
                 src={frameSrc.current}
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                 allowFullScreen
@@ -1950,35 +1982,42 @@ function App() {
             ) : (
               <div className="empty-player">
                 <div className="play-symbol">▶</div>
-                <h3>Your video appears here</h3>
-                <p>Search a channel, then select a result.</p>
+                <h3>{t("Your video appears here")}</h3>
+                <p>{t("Search a channel, then select a result.")}</p>
               </div>
             )}
           </div>
           {localStatus === "loading" && (
             <p className="metadata-status" role="status">
               <span className="analyze-spinner" aria-hidden="true" />
-              Preparing a local preview…
+              {t("Preparing a local preview…")}
             </p>
           )}
           {localStatus.startsWith("error:") && (
             <div className="notice error">
               {localStatus.slice(6)}{" "}
-              <button onClick={() => void loadLocalPreview()}>Try again</button>
+              <button onClick={() => void loadLocalPreview()}>{t("Try again")}</button>
             </div>
           )}
           {local && (
             <p className="metadata-status">
-              Local preview of {timestamp(local.offset)} –{" "}
-              {timestamp(local.offset + local.length)}. Move In and Out inside
-              it, or{" "}
-              <button
-                className="inline-action"
-                onClick={() => void loadLocalPreview()}
-              >
-                reload around your selection
-              </button>
-              .
+              {tx(
+                "Local preview of {from} – {to}. Move In and Out inside it, or {reload}.",
+                {
+                  reload: (
+                    <button
+                      className="inline-action"
+                      onClick={() => void loadLocalPreview()}
+                    >
+                      {t("reload around your selection")}
+                    </button>
+                  ),
+                },
+                {
+                  from: timestamp(local.offset),
+                  to: timestamp(local.offset + local.length),
+                },
+              )}
             </p>
           )}
           {candidate && (
@@ -1992,11 +2031,11 @@ function App() {
                   )
                 }
               >
-                Open in YouTube ↗
+                {t("Open in YouTube ↗")}
               </button>
               {!local && localStatus !== "loading" && (
                 <button onClick={() => void loadLocalPreview()}>
-                  Local preview
+                  {t("Local preview")}
                 </button>
               )}
               <button
@@ -2008,20 +2047,20 @@ function App() {
                   )
                 }
               >
-                Copy link
+                {t("Copy link")}
               </button>
             </div>
           )}
           {playerError && <div className="notice error">{playerError}</div>}
           <div className="matched-line">
-            <span className="label">Matched line</span>
+            <span className="label">{t("Matched line")}</span>
             <p>
               {selectedLine ? (
                 <>
                   … <Highlight line={selectedLine} phrase={searchedPhrase} /> …
                 </>
               ) : (
-                "The caption line containing your phrase shows here."
+                t("The caption line containing your phrase shows here.")
               )}
             </p>
           </div>
@@ -2031,7 +2070,7 @@ function App() {
                 <div className="timeline-labels">
                   <span>{timestamp(0)}</span>
                   <span>
-                    {timestamp(time)} <small>PLAYHEAD</small>
+                    {timestamp(time)} <small>{t("PLAYHEAD")}</small>
                   </span>
                   <span>{timestamp(duration)}</span>
                 </div>
@@ -2091,14 +2130,14 @@ function App() {
                     <button
                       className="playhead-handle"
                       data-timeline-control="playhead"
-                      aria-label="Playhead"
+                      aria-label={t("Playhead")}
                       role="slider"
                       aria-valuemin={0}
                       aria-valuemax={duration}
                       aria-valuenow={time}
                       aria-valuetext={preciseTimestamp(time)}
                       disabled={!ready || !video || metadataLoading}
-                      title="Drag to seek"
+                      title={t("Drag to seek")}
                       onKeyDown={(e) => {
                         if (
                           ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
@@ -2164,46 +2203,46 @@ function App() {
                 >
                   <div className="point">
                     <button disabled={!ready || !previewMode} onClick={setIn}>
-                      Set In <kbd>I</kbd>
+                      {t("Set In")} <kbd>I</kbd>
                     </button>
                     <TimeInput
                       key={`in-${resetVersion}`}
-                      label="In"
+                      label={t("In")}
                       onValidity={setInValid}
                       value={start}
                       onChange={(n) => {
                         if (!validSection(n, end, duration))
-                          throw Error("In must precede Out.");
+                          throw Error(t("In must precede Out."));
                         setStart(n);
                       }}
                     />
                   </div>
                   <div className="point">
                     <button disabled={!ready || !previewMode} onClick={setOut}>
-                      Set Out <kbd>O</kbd>
+                      {t("Set Out")} <kbd>O</kbd>
                     </button>
                     <TimeInput
                       key={`out-${resetVersion}`}
-                      label="Out"
+                      label={t("Out")}
                       onValidity={setOutValid}
                       value={end}
                       onChange={(n) => {
                         if (!validSection(start, n, duration))
-                          throw Error("Out must follow In and fit the video.");
+                          throw Error(t("Out must follow In and fit the video."));
                         setEnd(n);
                       }}
                     />
                   </div>
                   <div className="time-input length-input padding-input">
                     <label className="length-label" htmlFor="padding">
-                      Padding
+                      {t("Padding")}
                       <br />
-                      (seconds)
+                      {t("(seconds)")}
                     </label>
                     <div className="number-stepper">
                       <input
                         id="padding"
-                        aria-label="Padding in seconds"
+                        aria-label={t("Padding in seconds")}
                         inputMode="numeric"
                         maxLength={2}
                         value={
@@ -2222,7 +2261,7 @@ function App() {
                         }}
                       />
                       <StepperButtons
-                        label="Padding"
+                        label={t("Padding")}
                         onStep={(delta) =>
                           setPadding(Math.max(0, Math.min(99, padding + delta)))
                         }
@@ -2231,9 +2270,9 @@ function App() {
                   </div>
                   <div className="time-input length-input calculated-length">
                     <span className="length-label">
-                      Length
+                      {t("Length")}
                       <br />
-                      (seconds)
+                      {t("(seconds)")}
                     </span>
                     <div className="number-stepper">
                       <LengthInput
@@ -2254,7 +2293,7 @@ function App() {
                         }}
                       />
                       <StepperButtons
-                        label="Length"
+                        label={t("Length")}
                         onStep={(delta) => {
                           setEnd(
                             stepPaddedLength(
@@ -2292,7 +2331,7 @@ function App() {
                       send("play");
                     }}
                   >
-                    {previewActive ? "■ Stop" : "▶ Preview selection"}
+                    {previewActive ? t("■ Stop") : t("▶ Preview selection")}
                   </button>
                   <button
                     className="reset-button"
@@ -2312,27 +2351,31 @@ function App() {
                       setMatches([]);
                       setMatchChosen(false);
                       setResetVersion((n) => n + 1);
-                      setMatchStatus("Full video selected.");
+                      setMatchStatus(t("Full video selected."));
                     }}
                   >
-                    Reset
+                    {t("Reset")}
                   </button>
                 </fieldset>
                 {padding > 0 && (
                   <small className="padding-summary">
-                    With padding: {preciseTimestamp(clipStart)} –{" "}
-                    {preciseTimestamp(clipEnd)}. Padding stops at the video
-                    boundaries.
+                    {t(
+                      "With padding: {start} – {end}. Padding stops at the video boundaries.",
+                      {
+                        start: preciseTimestamp(clipStart),
+                        end: preciseTimestamp(clipEnd),
+                      },
+                    )}
                   </small>
                 )}
               </fieldset>
               <div
                 className={`download-filename${fileNameEditing || fileNameEdited ? " is-editing" : ""}`}
               >
-                <span>File name</span>
+                <span>{t("File name")}</span>
                 <div>
                   <input
-                    aria-label="File name"
+                    aria-label={t("File name")}
                     value={fileName}
                     readOnly={busy}
                     onFocus={() => {
@@ -2356,7 +2399,7 @@ function App() {
                         matchFilename();
                       }
                     }}
-                    placeholder="Select a result, or type a sentence from its subtitles"
+                    placeholder={t("Select a result, or type a sentence from its subtitles")}
                   />
                   <span>.{container}</span>
                   <button
@@ -2364,22 +2407,21 @@ function App() {
                     className="lookup-button primary"
                     disabled={busy || !candidate || !fileName.trim()}
                     aria-busy={busy}
-                    aria-label={busy ? "Looking up subtitles" : "Look Up"}
+                    aria-label={busy ? t("Looking up subtitles") : t("Look Up")}
                     onClick={() => void matchFilename()}
                   >
                     {busy ? (
                       <>
                         <span className="analyze-spinner" aria-hidden="true" />
-                        <span>Looking up…</span>
+                        <span>{t("Looking up…")}</span>
                       </>
                     ) : (
-                      "Look Up"
+                      t("Look Up")
                     )}
                   </button>
                 </div>
                 <small>
-                  Choose an example, then click Look Up (or press Enter) to load
-                  its timings. The same text names your file.
+                  {t("Choose an example, then click Look Up (or press Enter) to load its timings. The same text names your file.")}
                 </small>
               </div>
               <p className="match-status" role="status">
@@ -2403,24 +2445,22 @@ function App() {
                 <input
                   type="checkbox"
                   disabled={!video || busy}
-                  aria-label="Precise Cut"
+                  aria-label={t("Precise Cut")}
                   aria-describedby="precise-cut-description"
                   checked={precise}
                   onChange={(e) => setPrecise(e.target.checked)}
                 />
-                <span>Precise Cut</span>
+                <span>{t("Precise Cut")}</span>
                 <small id="precise-cut-description">
                   {precise
-                    ? "Re-encodes for accurate boundaries. Automatic uses H.264 / AAC."
-                    : "Fast Cut preserves streams; boundaries may align to keyframes."}
+                    ? t("Re-encodes for accurate boundaries. Automatic uses H.264 / AAC.")
+                    : t("Fast Cut preserves streams; boundaries may align to keyframes.")}
                 </small>
               </div>
             </fieldset>
             {!video && (
               <small className="trim-hint">
-                Select a search result to set In and Out from its caption line.
-                Padding extends both ends, stopping at the beginning and end of
-                the video.
+                {t("Select a search result to set In and Out from its caption line. Padding extends both ends, stopping at the beginning and end of the video.")}
               </small>
             )}
           </div>
@@ -2429,11 +2469,11 @@ function App() {
         <section className="settings-card">
           <details>
             <summary>
-              Download settings{" "}
-              <small>1080p preferred · lower resolution if unavailable</small>
+              {t("Download settings")}{" "}
+              <small>{t("1080p preferred · lower resolution if unavailable")}</small>
             </summary>
             <div className="options">
-              <Field label="Container">
+              <Field label={t("Container")}>
                 <select
                   value={container}
                   onChange={(e) => setContainer(e.target.value)}
@@ -2442,7 +2482,7 @@ function App() {
                   <option value="mkv">MKV</option>
                 </select>
               </Field>
-              <Field label="Resolution">
+              <Field label={t("Resolution")}>
                 <select
                   disabled={mode === "audio"}
                   value={resolution}
@@ -2451,7 +2491,7 @@ function App() {
                     setCodec("auto");
                   }}
                 >
-                  <option value="">Best available</option>
+                  <option value="">{t("Best available")}</option>
                   {heights.map((h) => (
                     <option key={h} value={h}>
                       {h === 2160 ? "4K · " : h === 1440 ? "2K · " : ""}
@@ -2460,13 +2500,13 @@ function App() {
                   ))}
                 </select>
               </Field>
-              <Field label="Video codec">
+              <Field label={t("Video codec")}>
                 <select
                   disabled={mode === "audio"}
                   value={codec}
                   onChange={(e) => setCodec(e.target.value)}
                 >
-                  <option value="auto">Automatic</option>
+                  <option value="auto">{t("Automatic")}</option>
                   {[
                     ["h264", "H.264"],
                     ["hevc", "H.265 / HEVC"],
@@ -2475,48 +2515,48 @@ function App() {
                   ].map(([v, l]) => (
                     <option key={v} value={v} disabled={!codecs.has(v)}>
                       {l}
-                      {!codecs.has(v) ? " · unavailable" : ""}
+                      {!codecs.has(v) ? ` · ${t("unavailable")}` : ""}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Audio">
+              <Field label={t("Audio")}>
                 <select
                   value={audio}
                   disabled={mode === "audio"}
                   onChange={(e) => setAudio(e.target.value)}
                 >
-                  <option value="best">Best available</option>
-                  <option value="original">Original compatible stream</option>
-                  <option value="none">No audio</option>
+                  <option value="best">{t("Best available")}</option>
+                  <option value="original">{t("Original compatible stream")}</option>
+                  <option value="none">{t("No audio")}</option>
                 </select>
               </Field>
-              <Field label="Subtitles">
+              <Field label={t("Subtitles")}>
                 <select
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
                 >
-                  <option value="">None</option>
+                  <option value="">{t("None")}</option>
                   {Object.keys(video?.subtitles ?? {}).map((l) => (
                     <option key={l}>{l}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Download mode">
+              <Field label={t("Download mode")}>
                 <select value={mode} onChange={(e) => setMode(e.target.value)}>
-                  <option value="video">Video + audio</option>
-                  <option value="audio">Audio only</option>
+                  <option value="video">{t("Video + audio")}</option>
+                  <option value="audio">{t("Audio only")}</option>
                 </select>
               </Field>
             </div>
             <p className="format-note">
               ⓘ{" "}
               {precise && section
-                ? "Precise cut re-encodes. Resolution is retained and the output duration is checked."
+                ? t("Precise cut re-encodes. Resolution is retained and the output duration is checked.")
                 : compatible
-                  ? "Original streams are preserved where the selected container supports them; separate tracks require merging."
-                  : "This codec may not be supported in MP4. Choose MKV to preserve the original stream."}{" "}
-              Unavailable combinations fail explicitly.
+                  ? t("Original streams are preserved where the selected container supports them; separate tracks require merging.")
+                  : t("This codec may not be supported in MP4. Choose MKV to preserve the original stream.")}{" "}
+              {t("Unavailable combinations fail explicitly.")}
             </p>
           </details>
           <div className="destination">
@@ -2535,8 +2575,8 @@ function App() {
               <path d="M3 9h18" />
             </svg>
             <div>
-              <small>SAVE TO</small>
-              <p>{settings.destination || "Choose a download folder"}</p>
+              <small>{t("SAVE TO")}</small>
+              <p>{settings.destination || t("Choose a download folder")}</p>
             </div>
             <button
               className={settings.destination ? undefined : "attention"}
@@ -2547,7 +2587,7 @@ function App() {
                 })
               }
             >
-              Choose folder…
+              {t("Choose folder…")}
             </button>
           </div>
           <button
@@ -2557,17 +2597,17 @@ function App() {
             }
             onClick={enqueue}
           >
-            ＋ Add to Download Queue{" "}
-            <span>{section ? "Selected section" : "Entire video"}</span>
+            {t("＋ Add to Download Queue")}{" "}
+            <span>{section ? t("Selected section") : t("Entire video")}</span>
           </button>
           <p className="legal">
-            Download only content you own or have permission to download.
+            {t("Download only content you own or have permission to download.")}
           </p>
         </section>
         <section className="queue">
           <div className="section-heading">
             <h2>
-              Download queue <span className="count">{jobs.length}</span>
+              {t("Download queue")} <span className="count">{jobs.length}</span>
             </h2>
             <button
               disabled={
@@ -2585,15 +2625,15 @@ function App() {
                 })
               }
             >
-              Clear Finished
+              {t("Clear Finished")}
             </button>
           </div>
           {!jobs.length ? (
             <div className="queue-empty">
               <span>⇣</span>
               <div>
-                <strong>A home for your downloads</strong>
-                <p>Add a video and we’ll take it from here.</p>
+                <strong>{t("A home for your downloads")}</strong>
+                <p>{t("Add a video and we’ll take it from here.")}</p>
               </div>
             </div>
           ) : (
@@ -2621,7 +2661,7 @@ function App() {
                           : `${jobProgress(j).percent!.toFixed(1)}%`,
                         j.speed,
                         j.bytes,
-                        j.eta ? `${j.eta} remaining` : "",
+                        j.eta ? t("{eta} remaining", { eta: j.eta }) : "",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -2631,20 +2671,20 @@ function App() {
                     value={jobProgress(j).percent ?? undefined}
                     max="100"
                   />
-                  {j.message && <p>{j.message}</p>}
+                  {j.message && <p>{tb(j.message)}</p>}
                 </div>
                 <div className="job-actions">
                   {j.state === "completed" ? (
                     <button
                       onClick={() => act(() => invoke("reveal", { id: j.id }))}
                     >
-                      Reveal file
+                      {t("Reveal file")}
                     </button>
                   ) : j.state === "failed" ? (
                     <button
                       onClick={() => act(() => invoke("retry", { id: j.id }))}
                     >
-                      Retry
+                      {t("Retry")}
                     </button>
                   ) : j.state === "canceled" ? null : (
                     <>
@@ -2659,7 +2699,7 @@ function App() {
                           )
                         }
                       >
-                        {j.state === "paused" ? "Resume" : "Pause"}
+                        {j.state === "paused" ? t("Resume") : t("Pause")}
                       </button>
                       <button
                         onClick={() =>
@@ -2668,7 +2708,7 @@ function App() {
                           )
                         }
                       >
-                        Cancel
+                        {t("Cancel")}
                       </button>
                     </>
                   )}
@@ -2678,8 +2718,8 @@ function App() {
           )}
         </section>
         <footer>
-          <span>YOUGLISH DOWNLOADER</span>
-          <span>Made for your personal library.</span>
+          <span>CAPTION FINDER</span>
+          <span>{t("Made for your personal library.")}</span>
         </footer>
       </main>
       {pickerOpen && matches.length > 1 && video && (
@@ -2688,12 +2728,14 @@ function App() {
             className="modal match-picker"
             role="dialog"
             aria-modal="true"
-            aria-label="Choose an occurrence"
+            aria-label={t("Choose an occurrence")}
           >
-            <h2>Choose the occurrence</h2>
+            <h2>{t("Choose the occurrence")}</h2>
             <p>
-              This phrase appears {matches.length} times in the video. YouGlish
-              does not tell the app which one you picked, so choose it here.
+              {t(
+                "This phrase appears {count, plural, one {# time} other {# times}} in the video. YouGlish does not tell the app which one you picked, so choose it here.",
+                { count: matches.length },
+              )}
             </p>
             <ul>
               {matches.map((m, i) => {
@@ -2715,7 +2757,7 @@ function App() {
               })}
             </ul>
             <div className="error-popup-actions">
-              <button onClick={() => setPickerOpen(false)}>Decide later</button>
+              <button onClick={() => setPickerOpen(false)}>{t("Decide later")}</button>
             </div>
           </section>
         </div>
@@ -2745,43 +2787,52 @@ function App() {
             className="modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Account and Settings"
+            aria-label={t("Account and Settings")}
           >
             <div className="section-heading">
-              <h2>Account & Settings</h2>
-              <button onClick={() => setShowSettings(false)}>Done</button>
+              <h2>{t("Account & Settings")}</h2>
+              <button onClick={() => setShowSettings(false)}>{t("Done")}</button>
             </div>
-            <h3>Video player account</h3>
-            <p>Sign in to Google first, then connect YouTube and select your channel if asked. Close the account window when finished and search again to reload the player.</p>
+            <Field label={`🌐 ${t("Language")}`}>
+              <select
+                value={getLanguageChoice()}
+                onChange={(e) => void setLanguageChoice(e.target.value)}
+              >
+                <option value="">{t("Same as the system")}</option>
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <h3>{t("Video player account")}</h3>
+            <p>{t("Sign in to Google first, then connect YouTube and select your channel if asked. Close the account window when finished and search again to reload the player.")}</p>
             <div className="playback-test-actions">
               <button
                 onClick={() => act(() => invoke("youtube_sign_in_window"))}
               >
-                1. Sign in to Google ↗
+                {t("1. Sign in to Google ↗")}
               </button>
               <button
                 onClick={() => act(() => invoke("youtube_connect_window"))}
               >
-                2. Connect YouTube ↗
+                {t("2. Connect YouTube ↗")}
               </button>
               <button
                 onClick={() => act(() => invoke("youtube_playback_test"))}
               >
-                Check playback ↗
+                {t("Check playback ↗")}
               </button>
             </div>
             <p>
-              Your login is kept in the app’s browser storage. On YouTube, an
-              account avatar confirms sign-in; use its account menu to switch
-              accounts or sign out. A successful check plays a sample video in
-              that window.
+              {t("Your login is kept in the app’s browser storage. On YouTube, an account avatar confirms sign-in; use its account menu to switch accounts or sign out. A successful check plays a sample video in that window.")}
             </p>
-            <h3>Subtitle and download authentication</h3>
+            <h3>{t("Subtitle and download authentication")}</h3>
             <p>
-              Use an existing browser session for videos you’re authorized to
-              access. Anonymous is the default.
+              {t("Use an existing browser session for videos you’re authorized to access. Anonymous is the default.")}
             </p>
-            <Field label="Download authentication">
+            <Field label={t("Download authentication")}>
               <select
                 value={settings.browser || (settings.cookiesFile ? "file" : "")}
                 onChange={(e) =>
@@ -2803,8 +2854,8 @@ function App() {
                   })
                 }
               >
-                <option value="">Anonymous</option>
-                <option value="app">App’s YouTube session</option>
+                <option value="">{t("Anonymous")}</option>
+                <option value="app">{t("App’s YouTube session")}</option>
                 {browsers.map((browser) => (
                   <option key={browser} value={browser}>
                     {
@@ -2823,7 +2874,7 @@ function App() {
                     }
                   </option>
                 ))}
-                <option value="file">Import Netscape cookies…</option>
+                <option value="file">{t("Import Netscape cookies…")}</option>
               </select>
             </Field>
             {browserAccess === "blocked" && (
@@ -2833,24 +2884,16 @@ function App() {
                 style={{ display: "block" }}
               >
                 <p>
-                  macOS is blocking Caption Finder from reading this browser’s
-                  cookies. Press the button: System Settings opens with a small
-                  Caption Finder window beside it. Drag its icon into the Full
-                  Disk Access list, switch it on, and reopen the app. No
-                  permission is needed if you choose Opera or Vivaldi instead,
-                  or sign in with the app’s own YouTube session above. If
-                  Caption Finder is already in the list but this message
-                  stays, that entry belongs to an older build: remove it with
-                  the − button and drag the icon in again.
+                  {t("macOS is blocking Caption Finder from reading this browser’s cookies. Press the button: System Settings opens with a small Caption Finder window beside it. Drag its icon into the Full Disk Access list, switch it on, and reopen the app. No permission is needed if you choose Opera or Vivaldi instead, or sign in with the app’s own YouTube session above. If Caption Finder is already in the list but this message stays, that entry belongs to an older build: remove it with the − button and drag the icon in again.")}
                 </p>
                 <div className="playback-test-actions">
                   <button
                     onClick={() => act(() => invoke("open_privacy_settings"))}
                   >
-                    Allow access in System Settings ↗
+                    {t("Allow access in System Settings ↗")}
                   </button>
                   <button onClick={() => checkBrowserAccess(settings.browser)}>
-                    Check again
+                    {t("Check again")}
                   </button>
                 </div>
               </div>
@@ -2862,39 +2905,30 @@ function App() {
                 style={{ display: "block" }}
               >
                 <p>
-                  You’re not signed in to YouTube in this app yet. Press “1.
-                  Sign in to Google”, then “2. Connect YouTube” above, and
-                  choose your channel if asked. Until then, searches and
-                  downloads can’t use this option.
+                  {t("You’re not signed in to YouTube in this app yet. Press “1. Sign in to Google”, then “2. Connect YouTube” above, and choose your channel if asked. Until then, searches and downloads can’t use this option.")}
                 </p>
                 <div className="playback-test-actions">
                   <button
                     onClick={() => act(() => invoke("youtube_sign_in_window"))}
                   >
-                    1. Sign in to Google ↗
+                    {t("1. Sign in to Google ↗")}
                   </button>
-                  <button onClick={() => checkAppSession()}>Check again</button>
+                  <button onClick={() => checkAppSession()}>{t("Check again")}</button>
                 </div>
               </div>
             )}
             {settings.browser === "app" && appSession === true && (
-              <p className="access-ok">✓ Signed in to YouTube in this app.</p>
+              <p className="access-ok">{t("✓ Signed in to YouTube in this app.")}</p>
             )}
             {browserAccess === "ok" && settings.browser && (
               <p className="access-ok">
-                ✓ Caption Finder can read this browser’s cookies.
+                {t("✓ Caption Finder can read this browser’s cookies.")}
               </p>
             )}
             <p className="notice">
-              Selecting the app’s session uses only its YouTube cookies in a temporary file, removed when the operation finishes. Selecting another browser authorizes yt-dlp to read its cookies when you
-              analyze or download. Your operating system may request browser cookie-store
-
-              access. Cookies are never printed or copied into app settings, or
-              injected into the video player. This setting controls caption
-              retrieval and downloads; the player uses the app’s own sign-in
-              above.
+              {t("Selecting the app’s session uses only its YouTube cookies in a temporary file, removed when the operation finishes. Selecting another browser authorizes yt-dlp to read its cookies when you analyze or download. Your operating system may request browser cookie-store access. Cookies are never printed or copied into app settings, or injected into the video player. This setting controls caption retrieval and downloads; the player uses the app’s own sign-in above.")}
             </p>
-            <Field label="Videos to scan per search">
+            <Field label={t("Videos to scan per search")}>
               <input
                 type="number"
                 inputMode="numeric"
@@ -2917,8 +2951,10 @@ function App() {
                 onBlur={() => setScanDraft(null)}
               />
               <small>
-                Newest videos checked per search, 1–{MAX_SCAN}. Default{" "}
-                {DEFAULT_SCAN}.
+                {t("Newest videos checked per search, 1–{max}. Default {initial}.", {
+                  max: MAX_SCAN,
+                  initial: DEFAULT_SCAN,
+                })}
               </small>
             </Field>
             <label className="check-row">
@@ -2931,9 +2967,9 @@ function App() {
                   )
                 }
               />
-              <span>Don’t play the first found video automatically</span>
+              <span>{t("Don’t play the first found video automatically")}</span>
             </label>
-            <Field label="While a video loads">
+            <Field label={t("While a video loads")}>
               <select
                 value={loadingStyle}
                 onChange={(e) => {
@@ -2945,11 +2981,11 @@ function App() {
                   }
                 }}
               >
-                <option value="thumbnail">Show Thumbnail</option>
-                <option value="spinner">Show Spinner</option>
+                <option value="thumbnail">{t("Show Thumbnail")}</option>
+                <option value="spinner">{t("Show Spinner")}</option>
               </select>
             </Field>
-            <Field label="Results from several channels">
+            <Field label={t("Results from several channels")}>
               <select
                 value={mixChannels ? "mix" : "sequential"}
                 onChange={(e) => {
@@ -2962,15 +2998,14 @@ function App() {
                   }
                 }}
               >
-                <option value="sequential">One channel after another</option>
-                <option value="mix">Mix channels (take turns)</option>
+                <option value="sequential">{t("One channel after another")}</option>
+                <option value="mix">{t("Mix channels (take turns)")}</option>
               </select>
               <small>
-                Mixing takes the newest video from each channel, then the next
-                newest from each, and so on. Applies to the next search.
+                {t("Mixing takes the newest video from each channel, then the next newest from each, and so on. Applies to the next search.")}
               </small>
             </Field>
-            <Field label="Caption language">
+            <Field label={t("Caption language")}>
               <select
                 value={captionLanguage}
                 onChange={(e) => {
@@ -2983,21 +3018,19 @@ function App() {
                 }}
               >
                 <option value="auto">
-                  Automatic (from the search phrase)
+                  {t("Automatic (from the search phrase)")}
                 </option>
                 {LANGUAGE_CHOICES.map(([code, name]) => (
                   <option key={code} value={code}>
-                    {name}
+                    {captionLanguageName(code, name)}
                   </option>
                 ))}
               </select>
               <small>
-                Automatic follows the phrase’s alphabet, or the language each
-                video is spoken in for Latin letters. Pick a language to search
-                its captions or dubbed audio tracks.
+                {t("Automatic follows the phrase’s alphabet, or the language each video is spoken in for Latin letters. Pick a language to search its captions or dubbed audio tracks.")}
               </small>
             </Field>
-            <Field label="Search in captions">
+            <Field label={t("Search in captions")}>
               <select
                 value={captionSource}
                 onChange={(e) => {
@@ -3009,25 +3042,24 @@ function App() {
                   }
                 }}
               >
-                <option value="any">Either (uploaded captions preferred)</option>
-                <option value="manual">Uploaded (manual) captions only</option>
-                <option value="automatic">Automatic captions only</option>
+                <option value="any">{t("Either (uploaded captions preferred)")}</option>
+                <option value="manual">{t("Uploaded (manual) captions only")}</option>
+                <option value="automatic">{t("Automatic captions only")}</option>
               </select>
               <small>
-                Applies to the next search. Videos without the chosen kind are
-                skipped.
+                {t("Applies to the next search. Videos without the chosen kind are skipped.")}
               </small>
             </Field>
-            <Field label="Appearance">
+            <Field label={t("Appearance")}>
               <select
                 value={settings.appearance}
                 onChange={(e) =>
                   act(() => save({ ...settings, appearance: e.target.value }))
                 }
               >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                <option value="system">{t("System")}</option>
+                <option value="light">{t("Light")}</option>
+                <option value="dark">{t("Dark")}</option>
               </select>
             </Field>
           </section>
@@ -3061,7 +3093,7 @@ function StepperButtons({
     <span className="stepper-buttons">
       <button
         type="button"
-        aria-label={`Increase ${label} by one second`}
+        aria-label={t("Increase {label} by one second", { label })}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => onStep(1)}
       >
@@ -3069,7 +3101,7 @@ function StepperButtons({
       </button>
       <button
         type="button"
-        aria-label={`Decrease ${label} by one second`}
+        aria-label={t("Decrease {label} by one second", { label })}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => onStep(-1)}
       >
@@ -3098,19 +3130,19 @@ function LengthInput({
     try {
       const trimmed = text.trim();
       if (!/^\d+(\.\d{1,3})?$/.test(trimmed))
-        throw Error("Enter seconds, e.g. 7.32.");
+        throw Error(t("Enter seconds, e.g. 7.32."));
       onCommit(Number(trimmed));
       setInvalid("");
       onValidity(true);
     } catch (e) {
-      setInvalid(e instanceof Error ? e.message : String(e));
+      setInvalid(errText(e));
       onValidity(false);
     }
   };
   return (
     <>
       <input
-        aria-label="Length in seconds"
+        aria-label={t("Length in seconds")}
         inputMode="decimal"
         value={text}
         aria-invalid={!!invalid}
@@ -3151,7 +3183,7 @@ function TimeInput({
       setInvalid("");
       onValidity(true);
     } catch (e) {
-      setInvalid(String(e));
+      setInvalid(errText(e));
       onValidity(false);
     }
   };
@@ -3161,7 +3193,7 @@ function TimeInput({
       setInvalid("");
       onValidity(true);
     } catch (e) {
-      setInvalid(String(e));
+      setInvalid(errText(e));
       onValidity(false);
     }
   };
@@ -3169,7 +3201,7 @@ function TimeInput({
     <div className="time-input">
       <div className="number-stepper">
         <input
-          aria-label={`${label} timestamp`}
+          aria-label={t("{label} timestamp", { label })}
           value={text}
           aria-invalid={!!invalid}
           onChange={(e) => {
@@ -3189,8 +3221,10 @@ function TimeInput({
 }
 const helperWindow =
   new URLSearchParams(window.location.search).get("helper") === "grant";
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>{helperWindow ? <GrantHelper /> : <App />}</React.StrictMode>,
+void initLanguage().then(() =>
+  createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>{helperWindow ? <GrantHelper /> : <App />}</React.StrictMode>,
+  ),
 );
 
 function ErrorPopup({
@@ -3220,22 +3254,22 @@ function ErrorPopup({
       }}
     >
       <h2 id="error-title">
-        {nameFix ? "Fix file name" : "Something went wrong"}
+        {nameFix ? t("Fix file name") : t("Something went wrong")}
       </h2>
       <p id="error-message">{message}</p>
       {nameFix && (
         <dl className="filename-comparison">
-          <dt>Original name</dt>
-          <dd>{nameFix.original || "(empty)"}</dd>
-          <dt>Proposed name</dt>
+          <dt>{t("Original name")}</dt>
+          <dd>{nameFix.original || t("(empty)")}</dd>
+          <dt>{t("Proposed name")}</dt>
           <dd>{nameFix.proposed}</dd>
         </dl>
       )}
       <div className="error-popup-actions">
-        <button onClick={onClose}>{nameFix ? "Cancel" : "Close"}</button>
+        <button onClick={onClose}>{nameFix ? t("Cancel") : t("Close")}</button>
         {nameFix && (
           <button className="primary" onClick={onFix}>
-            Fix name
+            {t("Fix name")}
           </button>
         )}
       </div>

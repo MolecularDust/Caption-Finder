@@ -1,6 +1,7 @@
 import { timestamp } from "./domain";
 import type { SearchResult } from "./search";
 import { UNSPACED, words } from "./subtitles";
+import { t } from "./i18n";
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -100,11 +101,12 @@ export function ResultsList({
               <span className="result-meta">
                 <span className="chip">{timestamp(r.matches[0].start)}</span>
                 <span className="chip">
-                  {r.matches.length}{" "}
-                  {r.matches.length === 1 ? "match" : "matches"}
+                  {t("{count, plural, one {# match} other {# matches}}", {
+                    count: r.matches.length,
+                  })}
                 </span>
                 {r.track.kind.includes("automatic") && (
-                  <span className="chip subtle">auto captions</span>
+                  <span className="chip subtle">{t("auto captions")}</span>
                 )}
               </span>
             </span>

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 export type Format = {
   format_id: string;
   height: number | null;
@@ -42,7 +43,7 @@ export function normalizeUrl(input: string): string {
     u.password ||
     u.port
   )
-    throw Error("Enter a valid YouTube video URL.");
+    throw Error(t("Enter a valid YouTube video URL."));
   let id = "";
   if (u.hostname === "youtu.be") id = u.pathname.slice(1);
   else if (
@@ -55,7 +56,7 @@ export function normalizeUrl(input: string): string {
           ? u.pathname.slice(8).replace(/\/$/, "")
           : "";
   if (!/^[\w-]{11}$/.test(id))
-    throw Error("Use a YouTube, youtu.be, or Shorts video link.");
+    throw Error(t("Use a YouTube, youtu.be, or Shorts video link."));
   return `https://www.youtube.com/watch?v=${id}`;
 }
 export function timestamp(seconds: number): string {
@@ -66,9 +67,9 @@ export function timestamp(seconds: number): string {
 }
 export function parseTimestamp(text: string): number {
   if (!/^\d{2,}:\d{2}:\d{2}(\.\d{1,3})?$/.test(text))
-    throw Error("Use HH:MM:SS, optionally with milliseconds.");
+    throw Error(t("Use HH:MM:SS, optionally with milliseconds."));
   const [h, m, s] = text.split(":").map(Number);
-  if (m >= 60 || s >= 60) throw Error("Minutes and seconds must be below 60.");
+  if (m >= 60 || s >= 60) throw Error(t("Minutes and seconds must be below 60."));
   return h * 3600 + m * 60 + s;
 }
 export function validSection(a: number, b: number, d: number): boolean {
@@ -101,7 +102,7 @@ export function outFromLength(
     length <= 0 ||
     !validSection(start, out, duration)
   )
-    throw Error("Length must be positive and fit within the video.");
+    throw Error(t("Length must be positive and fit within the video."));
   return out;
 }
 
@@ -184,10 +185,10 @@ export function endFromPaddedLength(
   const clipEnd =
     Math.round((Math.max(0, start - extra) + length) * 1000) / 1000;
   if (!Number.isFinite(length) || length <= 0)
-    throw Error("Length must be a positive number of seconds.");
-  if (clipEnd > duration) throw Error("Length does not fit within the video.");
+    throw Error(t("Length must be a positive number of seconds."));
+  if (clipEnd > duration) throw Error(t("Length does not fit within the video."));
   const end = Math.round((clipEnd - extra) * 1000) / 1000;
-  if (end <= start) throw Error("Length is too short for the current padding.");
+  if (end <= start) throw Error(t("Length is too short for the current padding."));
   return end;
 }
 
@@ -250,16 +251,40 @@ export function jobProgress(job: Job): {
   percent: number | null;
 } {
   const running = ["downloading", "merging", "processing"].includes(job.state);
-  if (job.state === "completed") return { label: "completed", percent: 100 };
-  if (job.state === "cooldown") return { label: "Cooling down", percent: null };
+  if (job.state === "completed") return { label: stateText("completed"), percent: 100 };
+  if (job.state === "cooldown") return { label: t("Cooling down"), percent: null };
   if (job.state === "downloading" && job.phase === "preparing")
-    return { label: "Preparing", percent: null };
+    return { label: t("Preparing"), percent: null };
   if (job.state === "downloading" && job.phase === "finishing")
-    return { label: "Finishing", percent: null };
+    return { label: t("Finishing"), percent: null };
   if (running || job.state === "paused")
     return {
-      label: job.state,
+      label: stateText(job.state),
       percent: job.progress > 0 ? Math.min(100, job.progress) : null,
     };
-  return { label: job.state, percent: null };
+  return { label: stateText(job.state), percent: null };
+}
+
+/** The word for a queue row's state. The states themselves come from the Rust side. */
+export function stateText(state: string): string {
+  switch (state) {
+    case "queued":
+      return t("queued");
+    case "downloading":
+      return t("downloading");
+    case "merging":
+      return t("merging");
+    case "processing":
+      return t("processing");
+    case "paused":
+      return t("paused");
+    case "completed":
+      return t("completed");
+    case "failed":
+      return t("failed");
+    case "canceled":
+      return t("canceled");
+    default:
+      return state;
+  }
 }
