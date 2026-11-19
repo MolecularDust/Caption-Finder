@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildRelease, run, stagePayload } from "./windows-payload.mjs";
-if (process.platform !== "win32" || process.arch !== "x64")
-  throw Error("Build on Windows x64.");
+if (process.platform !== "win32" || !["x64", "arm64"].includes(process.arch))
+  throw Error("Build on Windows x64 or ARM64.");
 // Tauri downloads NSIS here the first time it builds an installer.
 const makensis = join(
   process.env.LOCALAPPDATA ?? "",
@@ -24,7 +24,10 @@ const version = JSON.parse(
 ).version;
 const outDir = resolve("dist-installer");
 mkdirSync(outDir, { recursive: true });
-const outFile = join(outDir, `Caption-Finder-Setup_${version}_x64.exe`);
+const outFile = join(
+  outDir,
+  `Caption-Finder-Setup_${version}_${process.arch}.exe`,
+);
 if (existsSync(outFile)) unlinkSync(outFile);
 run(makensis, [
   `/DPAYLOAD=${payload}`,
