@@ -101,6 +101,17 @@ export function mergedLister(
     }
   };
   return async (_from: number, count: number): Promise<ChannelEntry[]> => {
+    if (mix) {
+      const empty = queues
+        .map((_, k) => k)
+        .filter((k) => !queues[k].length && !done[k]);
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(6, empty.length) }, async () => {
+          while (next < empty.length) await refill(empty[next++]);
+        }),
+      );
+    }
     const out: ChannelEntry[] = [];
     while (out.length < count) {
       const live = queues.map((_, k) => k).filter((k) => queues[k].length || !done[k]);
