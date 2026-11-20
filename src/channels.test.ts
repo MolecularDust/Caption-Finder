@@ -62,6 +62,27 @@ describe("mixed channels", () => {
     const next = mergedLister(lister({ a: ids("a", 1), b: ids("b", 3) }), ["a", "b"], 10, 30, true);
     expect((await next(1, 10)).map((e) => e.id)).toEqual(["a0", "b0", "b1", "b2"]);
   });
+  it("prefetches empty channel queues concurrently up to 6 at a time", async () => {
+    let active = 0;
+    let peak = 0;
+    const sources = Array.from({ length: 8 }, (_, i) => `c${i}`);
+    const next = mergedLister(
+      async (s) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((r) => setTimeout(r, 10));
+        active -= 1;
+        return [{ id: `${s}-0` }, { id: `${s}-1` }];
+      },
+      sources,
+      10,
+      2,
+      true,
+    );
+    const out = await next(1, 8);
+    expect(out.map((e) => e.id)).toEqual(sources.map((s) => `${s}-0`));
+    expect(peak).toBe(6);
+  });
 });
 
 describe("video lists", () => {
